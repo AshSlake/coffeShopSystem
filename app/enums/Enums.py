@@ -1,4 +1,3 @@
-# CLASSE DE CONEXÂO E CRUD DO BANCO DE DADOS
 from enum import Enum
 
 
