@@ -1,5 +1,6 @@
 import mysql
-from ConnectFromDB import Database
+
+from src.database.connectFromDB import Database
 
 
 class Phones:

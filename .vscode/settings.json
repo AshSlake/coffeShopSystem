@@ -1,4 +1,4 @@
 {
-  "conventionalCommits.scopes": ["init", "add"],
-  "python.analysis.extraPaths": ["./app/constants"]
+  "conventionalCommits.scopes": ["init", "add", "fix"],
+  "python.analysis.extraPaths": ["./app/constants", "./src/data"]
 }

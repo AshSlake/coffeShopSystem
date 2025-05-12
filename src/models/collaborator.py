@@ -1,13 +1,13 @@
 from datetime import date
 import mysql
 import mysql.connector
-from Phones import Phones
-from ConnectFromDB import Database
-from Address import Address
-from app.enums.Enums import Cargos, NivelSistema
+
+from src.database.connectFromDB import Database
+from src.models.address import Address
+from src.models.phones import Phones
 
 
-class Customers:
+class Collaborator:
     def __init__(self, db: Database, phone: Phones, address: Address):
         self.db = db
         self.phones = phone
@@ -44,9 +44,7 @@ class Customers:
         self.fk_telefone: int = None
         self.fk_endereco: str = None
         try:
-            self.fk_telefone = self.phones.inserirTelefone(
-                novo_numero=telefone, cpf=cpf
-            )
+            self.fk_telefone = self.phones.inserirTelefone(novo_numero=telefone)
             self.fk_endereco = self.address.inserirEndereco(endereco=endereco)
             sql = """
             INSERT INTO colaboradores

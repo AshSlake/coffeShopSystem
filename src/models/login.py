@@ -1,4 +1,4 @@
-from ConnectFromDB import Database
+from src.database.connectFromDB import Database
 
 
 class Login:

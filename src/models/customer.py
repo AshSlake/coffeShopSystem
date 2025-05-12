@@ -1,8 +1,9 @@
 # SESSÃO CLIENTE:
 import mysql
 import mysql.connector
-from Phones import Phones
-from ConnectFromDB import Database
+
+from src.database.connectFromDB import Database
+from src.models.phones import Phones
 
 
 class Customers:

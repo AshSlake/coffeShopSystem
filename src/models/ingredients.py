@@ -1,6 +1,7 @@
 # SESSÃO INGREDIENTES
 import mysql, mysql.connector
-from ConnectFromDB import Database
+
+from src.database.connectFromDB import Database
 
 
 class Ingredients:
