@@ -15,7 +15,8 @@ class Database:
             password=os.getenv("DB_PASSWORD"),
             database=os.getenv("DB_DATABASE"),
         )
-        self.cursor = self.connection.cursor()
+        self.cursor = self.connection.cursor(dictionary=True)
+        self.verificarConexao()
 
     # METODOS:
     def verificarConexao(self):
@@ -99,7 +100,6 @@ class Database:
             print(f"✅ Registro atualizado com sucesso na tabela '{tabela}'!")
         except mysql.connector.Error as e:
             print(f"❌ Erro ao atualizar registro na tabela '{tabela}':\n{e}")
-            raise  # Relançar para que o chamador saiba do erro
 
 
 # exemplo de uso

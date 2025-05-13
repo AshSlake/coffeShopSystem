@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
-from tkcalendar import DateEntry
+from src.models.login import Login
 
 
 class Main:
@@ -124,10 +124,13 @@ class Main:
         self.container = ttk.Frame(root, style="Background.TFrame")
         self.container.pack(fill="both", expand=True)
 
-        self.criar_menu()
-        self.mostrar_tela_inicial()
-        # self.carregar_dados_iniciais() # -> Chamar aqui se tiver persistência
+        self.usuario_logado: bool = None
+        self.dados_usuario_logado: dict = None
+        self.loginPage()
 
+        self.login = Login()
+
+    # criação da barra de menu
     def criar_menu(self):
         barra_menu = tk.Menu(
             self.root,
@@ -140,16 +143,13 @@ class Main:
         # Menu Login
         menu_Login = tk.Menu(
             barra_menu,
-            tearoff=0,
+            tearoff=0,  # 0 no tearoff para tirar o tracejado
             bg=self.cor_fundo_frame,
             fg=self.cor_texto_escuro,
             font=self.fonte_label,
         )
-        menu_Login.add_command(
-            label="Login", command=lambda: self.mostrar_tela("login")
-        )
+        menu_Login.add_command(label="Sair", command=lambda: self.acao_sair())
 
-        menu_Login.add_command(label="Sair", command=lambda: self.mostrar_tela("sair"))
         barra_menu.add_cascade(label="Login", menu=menu_Login)
 
         # Menu Colaborador
@@ -248,7 +248,13 @@ class Main:
             command=lambda: self.mostrar_tela("listar_pedidos"),
         )
 
-        barra_menu.add_cascade(label="Cardapio Digital", menu=menu_pedidos)
+        barra_menu.add_cascade(label="Pedidos", menu=menu_pedidos)
+
+    def acao_sair(self):
+        self.root.config(menu="")
+        self.usuario_logado = False
+        self.dados_usuario_logado = None
+        self.loginPage()
 
     def limpar_container(self):
         """Remove todos os widgets do container principal."""
@@ -258,7 +264,7 @@ class Main:
     def mostrar_tela(self, nome_tela, modo="visualizar", data=None):
         """Gerencia as telas do sistema.
         modo: 'novo', 'editar', 'visualizar'
-        data: dados a serem carregados na tela (ex: para edição)
+        data: dados a serem carregados na tela.
         """
         self.limpar_container()
         self.id_colaborador_editando = None  # Reseta o ID de edição ao mudar de tela
@@ -267,20 +273,119 @@ class Main:
             self.criar_form_colaborador(modo, data)
         elif nome_tela == "lista_colaboradores":
             self.criar_lista_colaboradores()
+        elif nome_tela == "login":
+            self.loginPage()
         elif nome_tela == "tela_inicial":
             self.mostrar_tela_inicial()
-        # Adicionar outras telas aqui...
-        else:
-            self.mostrar_tela_inicial()  # Padrão
 
-    def mostrar_tela_inicial(self):
+        else:
+            self.loginPage()
+
+    def mostrar_tela_inicial(self, nome_pessoa: str):
         self.limpar_container()
         ttk.Label(
             self.container,
-            text="Bem-vindo ao Sistema CoffeeShop",
+            text=f"Bem-vindo, {nome_pessoa} ao Sistema CoffeeShop",
             style="Welcome.TLabel",
         ).pack(pady=150, padx=20)
 
+    # Aba Login
+    def loginPage(self):
+        """Tela de login do Sistema
+
+        args:
+            modo: varaivel para alteração de elementos na tela de login.
+
+        """
+        # Frame principal da tela de login
+        self.limpar_container()
+
+        # verifica se o usuario ja está logado
+        if self.usuario_logado:
+            nome = (
+                self.dados_usuario_logado["pessoa"]["nome"]
+                if self.dados_usuario_logado
+                else "Usuário"
+            )
+            self.mostrar_tela_inicial(nome_pessoa=nome)
+            return
+
+        login_frame = ttk.Frame(self.container, style="Background.TFrame")
+        login_frame.pack(expand=True)  # Centralização do frame
+
+        frame = ttk.Frame(login_frame, padding=(30, 20), style="TFrame")
+        frame.grid(row=0, column=0)  # não expande fica dentralizado
+
+        title_login = "Faça o login com seu CPF e SENHA"
+        ttk.Label(frame, text=title_login, style="Subtitle.TLabel").grid(
+            row=0, column=0, columnspan=2, pady=(0, 25), sticky="w"
+        )
+
+        # campos do login:
+        labels = [
+            "CPF",
+            "SENHA",
+        ]
+        self.entries = {}  # Dicionario para guardar os dados de login
+
+        # Para cada campo, adiciona um Label e um Entry na interface e salva o Entry no dicionário
+        for i, label_text in enumerate(labels):
+            ttk.Label(frame, text=label_text).grid(
+                row=i + 1, column=0, sticky="w", padx=5, pady=8
+            )
+            entry = ttk.Entry(frame, width=40, style="TEntry")
+            entry.grid(row=i + 1, column=1, sticky="ew", padx=5, pady=8)
+            # Guarda a entry para acesso posterior (usando texto do label como chave)
+            self.entries[label_text] = entry
+
+        self.cpf_entry_login = self.entries["CPF"]
+        self.senha_entry_login = self.entries["SENHA"]
+
+        # botões
+        btn_frame_login = ttk.Frame(frame, style="TFrame")
+        # Coloca abaixo do último campo (row=len(labels)+1)
+        btn_frame_login.grid(
+            row=len(labels) + 1, column=0, columnspan=2, pady=(30, 10), sticky="e"
+        )
+
+        ttk.Button(
+            btn_frame_login,
+            text="Login",
+            style="TButton",
+            command=lambda: self.fazer_login(
+                self.cpf_entry_login.get(), self.senha_entry_login.get()
+            ),
+        ).pack(side="left", padx=(0, 10))
+
+        frame.columnconfigure(1, weight=1)
+
+    def fazer_login(self, cpf, senha):
+        """Faza a verificação no banco de dados para validar o usuario"""
+
+        result = self.login.validate_login(cpf, senha)
+        if not result:
+            messagebox.showerror("Erro", "Usuário ou senha inválidos.")
+            raise ValueError("❌ Login Invalido")
+
+        self.usuario_logado = True
+        self.verificar_login()
+
+    def verificar_login(self, verbose: bool = False):
+        if self.usuario_logado:
+            self.dados_usuario_logado = self.login.searchDataFromPerson(
+                self.cpf_entry_login.get(), colaborador=True
+            )
+
+            # if verbose:
+            #     print(self.dados_usuario_logado)
+
+            nome: str = self.dados_usuario_logado["pessoa"]["nome"]
+            self.mostrar_tela_inicial(nome_pessoa=nome)
+            self.criar_menu()
+        else:
+            self.loginPage()
+
+    # Aba Colaboradores:
     def criar_form_colaborador(self, modo="novo", data=None):
         """Formulário de cadastro/edição de colaborador."""
         self.limpar_container()
@@ -565,9 +670,7 @@ class Main:
                 self.tree.delete(item)
 
             # Repopula a Treeview com os dados atuais de self.colaboradores
-            # Adapte as colunas aqui conforme a ordem em 'columns' e os dados em self.colaboradores
             for colab in self.colaboradores:
-                # Use .get() para evitar erros se alguma chave faltar no dicionário
                 self.tree.insert(
                     "",
                     "end",
@@ -575,14 +678,17 @@ class Main:
                         colab.get("id", ""),
                         colab.get("nome", ""),
                         colab.get("cargo", ""),
-                        colab.get("telefone", ""),  # Exemplo com telefone
-                        # Adicione mais colunas conforme necessário
+                        colab.get("telefone", ""),
                     ),
                 )
-        # else:
-        # Se a treeview não existe, talvez chamar a criação da tela?
-        # self.mostrar_tela("lista_colaboradores")
-        # Mas geralmente é chamado depois da criação.
+        else:
+            # Se a treeview não existe, chama a criação da tela
+            self.mostrar_tela("lista_colaboradores")
+
+    # Aba Clientes
+    # Aba Pratos
+    # Aba Cardapio Digital
+    # Aba pedidos
 
 
 if __name__ == "__main__":
