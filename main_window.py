@@ -320,6 +320,16 @@ class Main:
         # formata o telefone após verificado
         formated_telefone = formatar_telefone(telefone)
 
+        # Verificar função
+        if not funcao:
+            messagebox.showerror("❌Erro", "FUNÇÂO OBRIGATORIA")
+            return
+
+        # Verificar nivel sistema
+        if not nivelSystem:
+            messagebox.showerror("❌Erro", "NIVEL OBRIGATORIO")
+            return
+
         if modo == "novo":
             self.colaborador.inserirColaborador(
                 cpf=cpf,
