@@ -108,11 +108,15 @@ class ColaboradoresPage:
 
         # Preencher dados se estiver editando
         if modo == "editar" and data_colaborador:
-            self._id_colaborador_editando_form = data_colaborador.get("id")
+            print(data_colaborador)
             self.entries["cpf"].insert(0, data_colaborador.get("cpf", ""))
             self.entries["nome"].insert(0, data_colaborador.get("nome", ""))
-            self.entries["telefone"].insert(0, data_colaborador.get("telefone", ""))
-            self.entries["endereco"].insert(0, data_colaborador.get("endereco", ""))
+            self.entries["telefone"].insert(
+                0, data_colaborador.get("telefone_info", "")
+            )
+            self.entries["endereco"].insert(
+                0, data_colaborador.get("endereco_info", "")
+            )
 
             # --- Tratamento para Data Admissão ---
             data_ad_str = data_colaborador.get("data_admissao", "")
@@ -130,7 +134,7 @@ class ColaboradoresPage:
                     )
 
             # --- Preencher Comboboxes ---
-            nivel_sistema_val = data_colaborador.get("nivel_sistema", "")
+            nivel_sistema_val = data_colaborador.get("nivelSistem", "")
             if nivel_sistema_val and self.nivel_sistema_combobox:
                 try:
                     nivel = NivelSistema(int(nivel_sistema_val))
@@ -141,7 +145,7 @@ class ColaboradoresPage:
                         f"Aviso: Nível de sistema '{nivel_sistema_val}' não encontrado"
                     )
 
-            cargo_val = data_colaborador.get("cargo", "")
+            cargo_val = data_colaborador.get("funcao", "")
             if cargo_val and self.cargo_combobox:
                 if cargo_val in OPCOES_CARGO_DISPLAY:
                     self.cargo_combobox.set(cargo_val)
@@ -160,7 +164,7 @@ class ColaboradoresPage:
         ttk.Button(
             btn_frame,
             text="Salvar",
-            command=self._handle_salvar_colaborador,
+            command=lambda: self._handle_salvar_colaborador(modo),
             style="TButton",
         ).pack(side="left", padx=(0, 10))
         ttk.Button(
@@ -172,7 +176,7 @@ class ColaboradoresPage:
 
         frame.columnconfigure(1, weight=1)
 
-    def _handle_salvar_colaborador(self):
+    def _handle_salvar_colaborador(self, modo):
         # Obtém o texto selecionado
         nivel_selecionado = self.nivel_sistema_combobox.get()
 
@@ -200,7 +204,7 @@ class ColaboradoresPage:
             "cargo": self.cargo_combobox.get() if self.cargo_combobox else "",
             "id": self._id_colaborador_editando_form,
         }
-        self.main_controller.salvar_dados_colaborador(dados_colaborador)
+        self.main_controller.salvar_dados_colaborador(dados_colaborador, modo)
 
     def _handle_cancelar_form(self):
         """Notifica o controller principal para voltar à tela de lista ou inicial."""
@@ -339,7 +343,7 @@ class ColaboradoresPage:
             item_id = int(item_id_str)
             self.main_controller.solicitar_edicao_colaborador(item_id)
         except (ValueError, TypeError):
-            messagebox.showerror("Erro", f"ID inválido: {item_id_str}")
+            messagebox.showerror("Erro", f"CPF inválido: {item_id_str}")
 
     def _handle_excluir_selecionado(self):
         """Solicita ao controller principal para excluir um colaborador."""

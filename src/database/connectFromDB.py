@@ -78,11 +78,11 @@ class Database:
         if not hasattr(self, "cursor") or self.cursor is None:
             self.cursor = self.connection.cursor()
 
-    def searchIDFromDataBase(self, idClient: int, coluna: str, tabela: str):
+    def searchIDFromDataBase(self, cpf: str, coluna: str, tabela: str):
         """Busca o ID  no banco baseado no cpf
 
         Args:
-            idClient (int): CPF do cliente.
+            idClient (cpf): CPF do cliente.
             tabela (str): tabela a ser procurado
             coluna (str) : coluna a ser procurado
 
@@ -93,18 +93,22 @@ class Database:
             mysql.connector.Error: Se ocorrer erro na consulta.
         """
         try:
-            sql = "SELECT %s FROM %s WHERE cpf = %s"
-            self.cursor.execute(sql, (coluna, tabela, idClient))
+            self.abrirConexao()
+            sql = f"SELECT {coluna} FROM {tabela} WHERE cpf = %s"
+            self.cursor.execute(sql, (cpf,))
             resultado = self.cursor.fetchone()
-            return resultado[0] if resultado else None
+            return resultado[coluna] if resultado else None
         except mysql.connector.Error as e:
             print(f"❌ Erro ao buscar telefone do cliente: \n {e}")
             return None
+        finally:
+            self.fecharConexao()
 
     def atualizarRegistro(
         self, tabela: str, valores_dict: dict, campo_where: str, valor_where
     ):
-        """Atualiza registros de forma genérica em qualquer tabela.
+        """
+        Atualiza registros de forma genérica em qualquer tabela.
 
         Args:
             tabela (str): Nome da tabela a ser atualizada.
@@ -112,26 +116,37 @@ class Database:
             campo_where (str): Campo da cláusula WHERE.
             valor_where (Any): Valor do campo da cláusula WHERE.
 
+        Returns:
+            bool: True se a atualização for bem-sucedida, False caso contrário.
+
         Raises:
             mysql.connector.Error: Se ocorrer erro ao executar a atualização.
         """
         if not valores_dict:
             print("⚠️ Nenhum campo foi fornecido para atualização.")
-            return  # Idealmente deveria retornar False ou levantar uma exceção
+            return False
 
         try:
-            campos_sql = [f"{campo} = %s" for campo in valores_dict.keys()]
+            self.abrirConexao()
+
+            campos_sql = [f"`{campo}` = %s" for campo in valores_dict.keys()]
             valores = list(valores_dict.values())
             valores.append(valor_where)
 
-            sql = (
-                f"UPDATE {tabela} SET {', '.join(campos_sql)} WHERE {campo_where} = %s"
-            )
+            # Usar backticks para evitar conflitos com palavras reservadas e SQL injection em nomes de colunas/tabelas
+            sql = f"UPDATE `{tabela}` SET {', '.join(campos_sql)} WHERE `{campo_where}` = %s"
+
             self.cursor.execute(sql, tuple(valores))
             self.connection.commit()
             print(f"✅ Registro atualizado com sucesso na tabela '{tabela}'!")
+            return True
+
         except mysql.connector.Error as e:
             print(f"❌ Erro ao atualizar registro na tabela '{tabela}':\n{e}")
+            return False
+
+        finally:
+            self.fecharConexao()
 
 
 # exemplo de uso

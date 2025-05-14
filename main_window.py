@@ -246,13 +246,12 @@ class Main:
         self.criar_menu()
 
     # --- Métodos de Controle de Colaboradores ---
-    def salvar_dados_colaborador(self, dados_colaborador):
+    def salvar_dados_colaborador(self, dados_colaborador, modo: str):
         """Salva ou atualiza dados de um colaborador."""
-        if not dados_colaborador["cpf"] or not dados_colaborador["nome"]:
-            messagebox.showerror("Erro", "Nome e Cargo são obrigatórios.")
-            return
 
-        # editing_id = dados_colaborador.get("id")
+        if not dados_colaborador.get("cpf") or not dados_colaborador.get("nome"):
+            messagebox.showerror("Erro", "CPF e Nome são obrigatórios.")
+            return
 
         cpf = dados_colaborador["cpf"]
         nome = dados_colaborador["nome"]
@@ -271,7 +270,7 @@ class Main:
             return
 
         # verificar se cpf ja está cadastrado
-        if self.colaborador.cpf_existe(cpf):
+        if self.colaborador.cpf_existe(cpf) and modo == "novo":
             messagebox.showerror("❌Erro", "CPF JÀ EXISTE")
             return
 
@@ -288,39 +287,37 @@ class Main:
         # formata o telefone após verificado
         formated_telefone = formatar_telefone(telefone)
 
-        self.colaborador.inserirColaborador(
-            cpf=cpf,
-            nome=nome,
-            dataAd=data_ad_formatada_sql,
-            nivelSystem=nivelSystem,
-            funcao=funcao,
-            telefone=formated_telefone,
-            endereco=endereco,
-        )
-
-        self.mostrar_tela(
-            "lista_colaboradores"
-        )  # Volta para a lista, que será recarregada
+        if modo == "novo":
+            self.colaborador.inserirColaborador(
+                cpf=cpf,
+                nome=nome,
+                dataAd=data_ad_formatada_sql,
+                nivelSystem=nivelSystem,
+                funcao=funcao,
+                telefone=formated_telefone,
+                endereco=endereco,
+            )
+        else:
+            self.colaborador.atualizarColaborador(
+                cpf=cpf,
+                novo_nome=nome,
+                nova_data_AD=data_ad_formatada_sql,
+                novo_nivel_system=nivelSystem,
+                nova_funcao=funcao,
+                novo_telefone=formated_telefone,
+                novo_endereco=endereco,
+            )
+        self.recarregarLista()
 
     def solicitar_edicao_colaborador(self, colab_id):
         """Prepara e mostra o formulário para editar um colaborador."""
-        colaborador_para_editar = None
-        for colab in self.colaboradores_data:
-            if colab.get("id") == colab_id:
-                colaborador_para_editar = colab
-                break
+        colaborador = next(
+            (c for c in self.colaboradores_data if c["cpf"] == colab_id), None
+        )
 
-        if colaborador_para_editar:
-            self._id_colaborador_editando = (
-                colab_id  # Guarda o ID que está sendo editado
-            )
-            self.mostrar_tela(
-                "form_colaborador", modo="editar", data_extra=colaborador_para_editar
-            )
-        else:
-            messagebox.showerror(
-                "Erro", f"Colaborador com ID {colab_id} não encontrado."
-            )
+        self.colaboradores_page.criar_form_colaborador(
+            modo="editar", data_colaborador=colaborador
+        )
 
     def solicitar_exclusao_colaborador(self, colab_id, nome_colaborador):
         """Exclui um colaborador após confirmação."""

@@ -75,8 +75,7 @@ class Collaborator:
 
     def atualizarColaborador(
         self,
-        cpf: int,
-        novo_cpf: int,
+        cpf: str,
         novo_nome: str = None,
         nova_data_AD: date = None,
         novo_nivel_system: str = None,
@@ -91,8 +90,7 @@ class Collaborator:
         telefone e endereço.
 
         Args:
-            cpf (int): CPF atual do colaborador (identificador de busca).
-            novo_cpf (int): Novo CPF a ser atribuído.
+            cpf (str): CPF atual do colaborador (identificador de busca).
             novo_nome (str, opcional): Novo nome do colaborador.
             nova_data_AD (date, opcional): Nova data de admissão.
             novo_nivel_system (str, opcional): Novo nível no sistema.
@@ -107,8 +105,6 @@ class Collaborator:
         try:
             self.db.abrirConexao()
             valores_dict = {}
-            if novo_cpf is not None:
-                valores_dict["cpf"] = novo_cpf
             if novo_nome is not None:
                 valores_dict["nome"] = novo_nome
             if nova_data_AD is not None:
@@ -125,7 +121,7 @@ class Collaborator:
                 self.db.cursor.execute(sql, values)
                 self.db.connection.commit()
 
-            if novo_telefone or novo_endereco is not None:
+            if novo_telefone is not None:
                 id_telefone_customer = self.db.searchIDFromDataBase(
                     cpf, coluna="fk_telefone", tabela="colaboradores"
                 )
@@ -142,15 +138,13 @@ class Collaborator:
                 )
                 if id_endereco is not None:
                     self.db.atualizarRegistro(
-                        "enderecos",
-                        {"endereco": novo_endereco},
-                        "endereco",
-                        id_endereco,
+                        tabela="enderecos",
+                        valores_dict={"endereco": novo_endereco},
+                        campo_where="id_endereco",
+                        valor_where=id_endereco,
                     )
-        except (
-            mysql.connector.Error
-        ):  # Genérico, idealmente tratar especificamente ou relançar
-            print("❌ ocorreu um erro ao atualizar o cliente.")
+        except mysql.connector.Error as e:
+            print(f"❌ ocorreu um erro ao atualizar o cliente: \a {e}")
         finally:
             self.db.fecharConexao()
 
