@@ -208,7 +208,9 @@ class ColaboradoresPage:
         self.main_controller.mostrar_tela("lista_colaboradores")
 
     def criar_lista_colaboradores(self, colaboradores_data):
-        """Cria a lista de colaboradores com base nos dados fornecidos."""
+        print("Dados recebidos:", colaboradores_data)
+        """Cria a lista de colaboradores recuperando dados do MySQL"""
+
         self.limpar_container()
 
         frame = ttk.Frame(self.container, padding=20, style="Background.TFrame")
@@ -227,7 +229,15 @@ class ColaboradoresPage:
         scrollbar = ttk.Scrollbar(tree_frame)
         scrollbar.pack(side="right", fill="y")
 
-        columns = ("id", "nome", "cargo", "telefone")
+        columns = (
+            "cpf",
+            "nome",
+            "data_admissao",
+            "nivel_sistema",
+            "cargo",
+            "telefone",
+            "endereco",
+        )
         self.tree = ttk.Treeview(
             tree_frame,
             columns=columns,
@@ -237,18 +247,47 @@ class ColaboradoresPage:
         )
         scrollbar.config(command=self.tree.yview)
 
-        self.tree.heading("id", text="ID", anchor="w")
+        # Configura os cabeçalhos
+        self.tree.heading("cpf", text="CPF", anchor="w")
         self.tree.heading("nome", text="Nome", anchor="w")
+        self.tree.heading("data_admissao", text="Data Admissão", anchor="w")
+        self.tree.heading("nivel_sistema", text="Nível Sistema", anchor="w")
         self.tree.heading("cargo", text="Cargo", anchor="w")
         self.tree.heading("telefone", text="Telefone", anchor="w")
+        self.tree.heading("endereco", text="Endereço", anchor="w")
 
-        self.tree.column("id", width=60, stretch=False, anchor="center")
-        self.tree.column("nome", width=300, stretch=True)
-        self.tree.column("cargo", width=150, stretch=True)
-        self.tree.column("telefone", width=150, stretch=True)
+        # Configura as colunas
+        self.tree.column("cpf", width=120, stretch=False)
+        self.tree.column("nome", width=200, stretch=True)
+        self.tree.column("data_admissao", width=200, stretch=False)
+        self.tree.column("nivel_sistema", width=120, stretch=False)
+        self.tree.column("cargo", width=150, stretch=False)
+        self.tree.column("telefone", width=120, stretch=False)
+        self.tree.column("endereco", width=200, stretch=True)
 
         self.tree.pack(fill="both", expand=True)
-        self.atualizar_display_lista(colaboradores_data)  # Popula com os dados iniciais
+
+        # Preenche a treeview com os dados
+        for colab in colaboradores_data:
+            nivel_sistema = (
+                NivelSistema(colab["nivelSistem"]).name.replace("_", " ")
+                if colab["nivelSistem"]
+                else ""
+            )
+
+            self.tree.insert(
+                "",
+                "end",
+                values=(
+                    colab["cpf"],
+                    colab["nome"],
+                    colab["data_admissao"],
+                    nivel_sistema,
+                    colab["funcao"],
+                    colab["telefone_info"],
+                    colab["endereco_info"],
+                ),
+            )
 
         btn_frame = ttk.Frame(frame, style="Background.TFrame")
         btn_frame.pack(fill="x", pady=(10, 0))
@@ -261,24 +300,25 @@ class ColaboradoresPage:
             ),
             style="TButton",
         ).pack(side="left", padx=5)
+
         ttk.Button(
             btn_frame,
             text="Editar Selecionado",
             command=self._handle_editar_selecionado,
             style="TButton",
         ).pack(side="left", padx=5)
+
         ttk.Button(
             btn_frame,
             text="Excluir Selecionado",
             command=self._handle_excluir_selecionado,
             style="TButton",
         ).pack(side="left", padx=5)
+
         ttk.Button(
             btn_frame,
             text="Atualizar Lista",
-            command=lambda: self.main_controller.mostrar_tela(
-                "lista_colaboradores"
-            ),  # Recarrega a tela com dados frescos
+            command=self.criar_lista_colaboradores,  # Agora recarrega os dados diretamente
             style="TButton",
         ).pack(side="left", padx=5)
 

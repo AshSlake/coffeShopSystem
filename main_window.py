@@ -31,7 +31,7 @@ class Main:
         # Estado da aplicação
         self.usuario_logado = False
         self.dados_usuario_logado = None
-        self.colaboradores_data = []  # Dados dos colaboradores gerenciados aqui
+
         self._id_colaborador_editando = (
             None  # ID do colaborador sendo editado (se houver)
         )
@@ -58,6 +58,7 @@ class Main:
         self.telefone = Phones(self.db)
         self.endereco = Address(self.db)
         self.colaborador = Collaborator(self.db, self.telefone, self.endereco)
+        self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
 
         # Iniciar com a tela de login
         self.mostrar_tela("login")

@@ -1,4 +1,5 @@
 from datetime import date
+from tkinter import messagebox
 import mysql
 import mysql.connector
 
@@ -201,3 +202,90 @@ class Collaborator:
             # Log do erro (opcional)
             print(f"Erro ao verificar CPF: {str(e)}")
             return False
+
+    def recuperar_colaboradores(self) -> list:
+        """Recupera todos os colaboradores da tabela 'colaboradores' no MySQL
+
+        Returns:
+            list: Lista de dicionários com os dados dos colaboradores
+        """
+        try:
+            # Executa a consulta SQL
+            self.db.cursor.execute(
+                """
+            SELECT 
+                cpf,
+                nome,
+                DATE_FORMAT(dataAd, '%d/%m/%Y') as data_admissao,
+                nivelSistem,
+                funcao,
+                fk_telefone,
+                fk_endereco
+            FROM colaboradores
+            ORDER BY nome
+            """
+            )
+
+            # Obtém os resultados
+            resultados = self.db.cursor.fetchall()
+
+            return resultados
+
+        except mysql.connector.Error as e:
+            messagebox.showerror("Erro", f"Falha ao recuperar colaboradores: {str(e)}")
+            return []
+
+    def recuperar_colaboradores_completos(self) -> list:
+        """Versão otimizada que reduz o número de consultas ao banco"""
+        try:
+            # 1. Recupera todos os colaboradores
+            colaboradores = self.recuperar_colaboradores()
+
+            # 2. Coleta todos os IDs únicos de telefones e endereços
+            telefones_ids = {
+                c["fk_telefone"] for c in colaboradores if c.get("fk_telefone")
+            }
+            enderecos_ids = {
+                c["fk_endereco"] for c in colaboradores if c.get("fk_endereco")
+            }
+
+            # 3. Busca todos os telefones e endereços de uma só vez
+            telefones = {
+                t["id_telefone"]: t
+                for t in self.phones.buscar_telefone_por_id(list(telefones_ids))
+            }
+            enderecos = {
+                e["id_endereco"]: e
+                for e in self.address.buscar_endereco_por_id(list(enderecos_ids))
+            }
+
+            # 4. Combina os dados
+            for colab in colaboradores:
+                if colab.get("fk_telefone") and colab["fk_telefone"] in telefones:
+                    colab.update(
+                        {
+                            "telefone_info": telefones[colab["fk_telefone"]][
+                                "telefone"
+                            ],
+                            "telefone_id": colab["fk_telefone"],
+                        }
+                    )
+
+                if colab.get("fk_endereco") and colab["fk_endereco"] in enderecos:
+                    colab.update(
+                        {
+                            "endereco_info": enderecos[colab["fk_endereco"]][
+                                "endereco"
+                            ],
+                            "endereco_id": colab["fk_endereco"],
+                        }
+                    )
+
+            return colaboradores
+
+        except Exception as e:
+            print(f"Erro ao recuperar dados completos: {e}")
+            return []
+        except mysql.connector.Error as e:
+            return []
+            raise Exception(f"Erro ao recuperar dados completos: {e}")
