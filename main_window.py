@@ -3,7 +3,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 import mysql, mysql.connector
+from src.models.customer import Customers
 from src.models.login import Login as LoginModel
+from src.ui.cliente_page import ClientPage
 from src.ui.login_page import LoginPage
 from src.ui.colaboradores_page import ColaboradoresPage
 from src.database.connectFromDB import Database as db
@@ -57,11 +59,19 @@ class Main:
             main_controller=self,  # Passa a instância de Main
             cor_fundo_janela=self.cor_fundo_janela,
         )
+        self.client_page = ClientPage(
+            container=self.container,
+            limpar_container=self.limpar_container,
+            main_controller=self,  # Passa a instância de Main
+            cor_fundo_janela=self.cor_fundo_janela,
+        )
         self.db = db()
         self.telefone = Phones(self.db)
         self.endereco = Address(self.db)
         self.colaborador = Collaborator()
+        self.cliente = Customers(self.db, self.telefone)
         self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
+        self.cliente_data = self.cliente.recuperar_clientes_completos()
 
         # Iniciar com a tela de login
         self.mostrar_tela("login")
@@ -167,6 +177,7 @@ class Main:
             font=self.fonte_label,
         )
         self.root.config(menu=barra_menu)
+        # Menu Login
         menu_login = tk.Menu(
             barra_menu,
             tearoff=0,
@@ -176,6 +187,7 @@ class Main:
         )
         menu_login.add_command(label="Sair", command=self.acao_sair)
         barra_menu.add_cascade(label="Login", menu=menu_login)
+        # Menu Colaborador
         menu_colab = tk.Menu(
             barra_menu,
             tearoff=0,
@@ -192,6 +204,23 @@ class Main:
             command=lambda: self.mostrar_tela("lista_colaboradores"),
         )
         barra_menu.add_cascade(label="Colaboradores", menu=menu_colab)
+        # Menu Cliente
+        menu_cliente = tk.Menu(
+            barra_menu,
+            tearoff=0,
+            bg=self.cor_fundo_frame,
+            fg=self.cor_texto_escuro,
+            font=self.fonte_label,
+        )
+        menu_cliente.add_command(
+            label="Cadastrar Novo Cliente",
+            command=lambda: self.mostrar_tela("form_cliente", modo="novo"),
+        )
+        menu_cliente.add_command(
+            label="Clientes",
+            command=lambda: self.mostrar_tela("lista_clientes"),
+        )
+        barra_menu.add_cascade(label="Clientes", menu=menu_cliente)
 
     # Reseta todos os dados do usuario atual e desliga o menu
     def acao_sair(self):
@@ -215,10 +244,14 @@ class Main:
             self.colaboradores_page.criar_lista_colaboradores(self.colaboradores_data)
         elif nome_tela == "login":
             self.login_page.criar_tela_login()
+        elif nome_tela == "form_cliente":
+            self.client_page.criar_form_clientes(modo, data_extra)
+        elif nome_tela == "lista_clientes":
+            self.client_page.criar_lista_clientes(self.cliente_data)
         elif nome_tela == "tela_inicial":
             nome_pessoa = self.dados_usuario_logado["pessoa"]["nome"]
             self.mostrar_tela_inicial_conteudo(nome_pessoa)
-        else:  # Fallback para tela de login
+        else:
             self.login_page.criar_tela_login()
 
     def mostrar_tela_inicial_conteudo(self, nome_pessoa: str):
@@ -332,7 +365,100 @@ class Main:
                 print(f"❌erro ao deletar colaborador")
                 return
 
-            self.recarregarLista()  # Atualiza a lista
+            self.recarregarLista()
+
+    # --- Métodos de Controle de Cliente ---
+    def solicitar_edicao_cliente(self, cpf):
+        """Prepara e mostra o formulário para editar um cliente."""
+
+        # 1) Puxe sempre os dados completos (com telefone_info)
+        self.cliente_data = self.cliente.recuperar_clientes_completos()
+        print(self.cliente_data)
+
+        # 2) Normalize o CPF para string, sem formatação
+        cpf_str = "".join(filter(str.isdigit, str(cpf)))
+
+        # 3) Procure convertendo também o que está em cliente_data para string
+        cliente = next(
+            (
+                c
+                for c in self.cliente_data
+                if "".join(filter(str.isdigit, str(c["cpf"]))) == cpf_str
+            ),
+            None,
+        )
+
+        if not cliente:
+            messagebox.showerror("Erro", "Cliente não encontrado para edição.")
+            return
+
+        # 4) Passe pro form apenas as chaves que ele vai preencher
+        data_para_form = {
+            "cpf": cliente["cpf"],
+            "nome": cliente["nome"],
+            "telefone": cliente.get("telefone_info", ""),
+        }
+
+        self.client_page.criar_form_clientes(
+            modo="editar", data_colaborador=data_para_form
+        )
+
+    def solicitar_exclusao_cliente(self, client_id, nome_cliente):
+        """Exclui um cliente após confirmação."""
+        if messagebox.askyesno(
+            "Confirmar Exclusão",
+            f"Tem certeza que deseja excluir '{nome_cliente}' (CPF: {client_id})?",
+        ):
+            try:
+                self.cliente.deletarCliente(cpf=client_id)
+                messagebox.showinfo("Sucesso", "Cliente excluído!")
+            except mysql.connector.Error as e:
+                print(f"❌erro ao deletar colaborador")
+                return
+
+            self.recarregarListaCliente()
+
+    def salvar_dados_cliente(self, dados_cliente, modo: str):
+        if not dados_cliente.get("cpf") or not dados_cliente.get("nome"):
+            messagebox.showerror("Erro", "CPF e Nome são obrigatórios.")
+            return
+
+        cpf = dados_cliente["cpf"]
+        nome = dados_cliente["nome"]
+        telefone = dados_cliente["telefone"]
+
+        # verificar cpf valido
+        if not validar_cpf(cpf):
+            messagebox.showerror("❌Erro", "CPF INVÁLIDO")
+            return
+
+        # verificar se cpf ja está cadastrado
+        if self.cliente.cpf_existe_cliente(cpf) and modo == "novo":
+            messagebox.showerror("❌Erro", "CPF JÀ EXISTE")
+            return
+
+        # verificar numero de telefone
+        if not validar_telefone_celular(telefone):
+            messagebox.showerror("❌Erro", "TELEFONE INVALIDO")
+            return
+
+        # formata o telefone após verificado
+        formated_telefone = formatar_telefone(telefone)
+
+        if modo == "novo":
+            self.cliente.inserirCliente(
+                cpf=cpf,
+                nome=nome,
+                telefone=formated_telefone,
+            )
+        else:
+            self.cliente.atualizarCliente(
+                cpf=cpf,
+                novo_nome=nome,
+                novo_telefone=formated_telefone,
+            )
+
+        self.recarregarListaCliente()
 
     def recarregarLista(self):
         """metodo para recarregar a lista de colaboradores"""
@@ -340,6 +466,11 @@ class Main:
         self.colaboradores_page.criar_lista_colaboradores(
             colaboradores_data=self.colaboradores_data
         )
+
+    def recarregarListaCliente(self):
+        """metodo para recarregar a lista de colaboradores"""
+        self.cliente_data = self.cliente.recuperar_clientes_completos()
+        self.client_page.criar_lista_clientes(clientes_data=self.cliente_data)
 
 
 if __name__ == "__main__":
