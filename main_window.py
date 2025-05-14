@@ -9,6 +9,7 @@ from src.models.phones import Phones
 from src.models.address import Address
 from src.models.collaborator import Collaborator
 from src.utils.verificadorCpf import validar_cpf
+from src.utils.verificadorEndereco import validar_endereco
 from src.utils.verificarTelefone import formatar_telefone, validar_telefone_celular
 
 
@@ -57,7 +58,7 @@ class Main:
         self.db = db()
         self.telefone = Phones(self.db)
         self.endereco = Address(self.db)
-        self.colaborador = Collaborator(self.db, self.telefone, self.endereco)
+        self.colaborador = Collaborator()
         self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
 
         # Iniciar com a tela de login
@@ -265,19 +266,22 @@ class Main:
         # verificar cpf valido
         if not validar_cpf(cpf):
             messagebox.showerror("❌Erro", "CPF INVÁLIDO")
-            raise ValueError(
-                "❌CPF deve conter 11 dígitos e não pode ter todos os números iguais"
-            )
+            return
 
         # verificar se cpf ja está cadastrado
-        if not self.colaborador.cpf_existe(cpf):
+        if self.colaborador.cpf_existe(cpf):
             messagebox.showerror("❌Erro", "CPF JÀ EXISTE")
-            raise ValueError("❌CPF DUPLICADO NO BANCO DE DADOS")
+            return
 
         # verificar numero de telefone
         if not validar_telefone_celular(telefone):
             messagebox.showerror("❌Erro", "TELEFONE INVALIDO")
-            raise ValueError("❌TELEFONE INVALIDO")
+            return
+
+        # verificar endereco
+        if not validar_endereco(endereco):
+            messagebox.showerror("❌Erro", "ENDEREÇO INVALIDO")
+            return
 
         # formata o telefone após verificado
         formated_telefone = formatar_telefone(telefone)

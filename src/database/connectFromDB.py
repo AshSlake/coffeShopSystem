@@ -29,7 +29,31 @@ class Database:
             if self.connection.is_connected():
                 print("✅ Conexao estabelecida com sucesso")
         except mysql.connector.Error as e:
+            self.garantir_conexao()
             print(f"❌ Erro ao se conectar ao Banco de dados: \n {e}")
+
+    def abrirConexao(self):
+        """Abre (ou reabre) a conexão com o banco de dados MySQL e o cursor.
+
+        Este método é seguro para ser chamado após uma desconexão ou falha na conexão.
+        Ele atualiza `self.connection` e `self.cursor` com uma nova sessão.
+
+        Raises:
+            mysql.connector.Error: Se ocorrer erro na conexão com o banco.
+        """
+        try:
+            print("🌐 Estabelecendo nova conexão com o banco de dados...")
+            self.connection = mysql.connector.connect(
+                host=os.getenv("DB_HOST"),
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASSWORD"),
+                database=os.getenv("DB_DATABASE"),
+            )
+            self.cursor = self.connection.cursor(dictionary=True)
+            print("✅ Nova conexão estabelecida com sucesso.")
+        except mysql.connector.Error as e:
+            print(f"❌ Falha ao abrir a conexão com o banco: {e}")
+            raise
 
     def fecharConexao(self):
         """Fecha a conexão com o banco de dados.
@@ -45,6 +69,14 @@ class Database:
             print("🔒 Conexão encerrada.")
         except mysql.connector.Error as e:
             print(f"❌ Erro ao fechar a conexão: {e}")
+
+    def garantir_conexao(self):
+        """garante a conexão"""
+        if not self.connection.is_connected():
+            print("🔄 Reconectando ao banco de dados...")
+            self.connection.reconnect(attempts=3, delay=2)
+        if not hasattr(self, "cursor") or self.cursor is None:
+            self.cursor = self.connection.cursor()
 
     def searchIDFromDataBase(self, idClient: int, coluna: str, tabela: str):
         """Busca o ID  no banco baseado no cpf

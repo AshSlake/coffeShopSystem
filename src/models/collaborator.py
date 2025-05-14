@@ -9,10 +9,10 @@ from src.models.phones import Phones
 
 
 class Collaborator:
-    def __init__(self, db: Database, phone: Phones, address: Address):
-        self.db = db
-        self.phones = phone
-        self.address = address
+    def __init__(self):
+        self.db = Database()
+        self.phones = Phones(self.db)
+        self.address = Address(self.db)
 
     def inserirColaborador(
         self,
@@ -45,8 +45,10 @@ class Collaborator:
         self.fk_telefone: int = None
         self.fk_endereco: str = None
         try:
+
             self.fk_telefone = self.phones.inserirTelefone(novo_numero=telefone)
             self.fk_endereco = self.address.inserirEndereco(endereco=endereco)
+            self.db.abrirConexao()
             sql = """
             INSERT INTO colaboradores
             (cpf, nome, dataAd, nivelSistem, funcao, fk_telefone, fk_endereco)
@@ -64,13 +66,12 @@ class Collaborator:
             self.db.cursor.execute(sql, data)
             self.db.connection.commit()
             print("✅ Colaborador inserido com sucesso")
-            # else:
-            #     print("⚠️ Todos os campos precisam ser preenchidos para a inserção.")
-            #     return
         except mysql.connector.Error as e:
             self.phones.deletarTelefone(self.fk_telefone)
             self.address.deletarEndereco(self.fk_endereco)
             raise ValueError(f"❌ Erro ao inserir um novo colaborador: \n{e}")
+        finally:
+            self.db.fecharConexao()
 
     def atualizarColaborador(
         self,
@@ -104,6 +105,7 @@ class Collaborator:
             no banco de dados.
         """
         try:
+            self.db.abrirConexao()
             valores_dict = {}
             if novo_cpf is not None:
                 valores_dict["cpf"] = novo_cpf
@@ -149,6 +151,8 @@ class Collaborator:
             mysql.connector.Error
         ):  # Genérico, idealmente tratar especificamente ou relançar
             print("❌ ocorreu um erro ao atualizar o cliente.")
+        finally:
+            self.db.fecharConexao()
 
     def deletarColaborador(self, cpf_colaborador: int):
         """
@@ -162,12 +166,15 @@ class Collaborator:
         """
 
         try:
+            self.db.abrirConexao()
             sql = "DELETE FROM colaboradores WHERE cpf = %s"
             self.db.cursor.execute(sql, (cpf_colaborador,))
             self.db.connection.commit()
             print(f"✅ Colaborador com CPF:({cpf_colaborador}) excluído com sucesso.")
         except mysql.connector.Error as e:
             print(f"❌ Erro ao excluir o colaborador:\n{e}")
+        finally:
+            self.db.fecharConexao()
 
     def cpf_existe(self, cpf: str) -> bool:
         """
@@ -183,25 +190,27 @@ class Collaborator:
             ValueError: Se o CPF for inválido
         """
         try:
+            self.db.abrirConexao()
             # Remove caracteres não numéricos e valida formato básico
             cpf_limpo = "".join(filter(str.isdigit, cpf))
             if len(cpf_limpo) != 11:
                 raise ValueError("CPF deve conter 11 dígitos")
 
             # Consulta segura com parâmetros para evitar SQL injection
-            sql = "SELECT COUNT(1) FROM colaboradores WHERE cpf = %s"
+            sql = "SELECT COUNT(1) AS total FROM colaboradores WHERE cpf = %s"
             self.db.cursor.execute(sql, (cpf_limpo,))
 
             # Obtém o resultado (fetchone retorna uma tupla, ex: (1,))
             resultado = self.db.cursor.fetchone()
 
             # Retorna True se count > 0
-            return resultado[0] > 0 if resultado else False
-
+            return resultado["total"] > 0 if resultado else False
         except Exception as e:
-            # Log do erro (opcional)
-            print(f"Erro ao verificar CPF: {str(e)}")
-            return False
+            raise ValueError(f"Erro ao verificar CPF: \a {str(e)}")
+        except mysql.connector.Error as e:
+            raise ValueError(f"Erro ao validar cpf: \a {e}")
+        finally:
+            self.db.fecharConexao()
 
     def recuperar_colaboradores(self) -> list:
         """Recupera todos os colaboradores da tabela 'colaboradores' no MySQL
@@ -210,6 +219,7 @@ class Collaborator:
             list: Lista de dicionários com os dados dos colaboradores
         """
         try:
+            self.db.abrirConexao()
             # Executa a consulta SQL
             self.db.cursor.execute(
                 """
@@ -234,10 +244,13 @@ class Collaborator:
         except mysql.connector.Error as e:
             messagebox.showerror("Erro", f"Falha ao recuperar colaboradores: {str(e)}")
             return []
+        finally:
+            self.db.fecharConexao()
 
     def recuperar_colaboradores_completos(self) -> list:
         """Versão otimizada que reduz o número de consultas ao banco"""
         try:
+            self.db.abrirConexao()
             # 1. Recupera todos os colaboradores
             colaboradores = self.recuperar_colaboradores()
 
@@ -287,5 +300,6 @@ class Collaborator:
             print(f"Erro ao recuperar dados completos: {e}")
             return []
         except mysql.connector.Error as e:
-            return []
             raise Exception(f"Erro ao recuperar dados completos: {e}")
+        finally:
+            self.db.fecharConexao()

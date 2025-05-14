@@ -19,8 +19,7 @@ class Phones:
             mysql.connector.Error: Se ocorrer erro ao inserir o telefone.
         """
         try:
-            # Ajustado para um insert mais padrão, assumindo que 'fk_cliente' pode ser NULL
-            # ou que você sempre fornecerá um CPF se for para associar.
+            self.db.abrirConexao()
             sql = "INSERT INTO telefones (telefone) VALUES (%s)"
             valores = (novo_numero,)
             self.db.cursor.execute(sql, valores)
@@ -30,8 +29,8 @@ class Phones:
             return newID
         except mysql.connector.Error as e:
             print(f"❌ Erro ao inserir telefone: \n {e}")
-            # Considere relançar o erro ou retornar None para indicar falha
-            # raise
+        finally:
+            self.db.fecharConexao()
 
     def atualizarTelefone(
         self, id_telefone: int, novo_numero: int = None, fk_cliente: str = None
@@ -46,6 +45,7 @@ class Phones:
         Raises:
             mysql.connector.Error: Se ocorrer erro na atualização.
         """
+
         valores_dict = {}
         if novo_numero is not None:
             valores_dict["telefone"] = novo_numero
@@ -54,6 +54,7 @@ class Phones:
 
         if valores_dict:
             try:
+                self.db.abrirConexao()
                 self.db.atualizarRegistro(
                     "telefones", valores_dict, "id_telefone", id_telefone
                 )
@@ -62,6 +63,8 @@ class Phones:
             ) as e:  # Adicionado para capturar erro do atualizarRegistro
                 print(f"❌ Erro ao atualizar telefone: \n {e}")
                 # raise
+            finally:
+                self.db.fecharConexao()
 
     def buscar_telefone_por_id(
         self, ids_telefone: int | list[int]
@@ -86,7 +89,7 @@ class Phones:
             mysql.connector.Error: Se ocorrer erro na consulta ao banco de dados.
         """
         try:
-            self.db.cursor = self.db.connection.cursor(dictionary=True)
+            self.db.abrirConexao()
 
             # Se for uma lista de IDs
             if isinstance(ids_telefone, list):
@@ -114,8 +117,7 @@ class Phones:
             print(f"❌ Erro ao buscar telefone por ID: \n{e}")
             raise
         finally:
-            if hasattr(self.db, "cursor") and self.db.cursor:
-                self.db.cursor.close()
+            self.db.fecharConexao()
 
     def deletarTelefone(self, id_telefone):
         """Deleta um número de telefone.
@@ -127,9 +129,12 @@ class Phones:
             mysql.connector.Error: Se ocorrer erro na exclusão.
         """
         try:
+            self.db.abrirConexao()
             sql = "DELETE FROM telefones WHERE id_telefone = %s"
             self.db.cursor.execute(sql, (id_telefone,))
             self.db.connection.commit()
             print("✅ Número deletado com sucesso.")
         except mysql.connector.Error as e:
             print(f"❌ Erro ao deletar o telefone: \n {e}")
+        finally:
+            self.db.fecharConexao()

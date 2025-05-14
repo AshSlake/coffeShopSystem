@@ -22,6 +22,7 @@ class Address:
         """
 
         try:
+            self.db.abrirConexao()
             if endereco and endereco.strip():
                 sql = "INSERT INTO enderecos(endereco) VALUES(%s);"
                 data: tuple = (endereco,)
@@ -35,6 +36,8 @@ class Address:
                 return None  # Retornar None para indicar falha ou ausência de inserção
         except mysql.connector.Error as e:
             print(f"❌ Erro ao inserir endereco na tabela: \n{e}")
+        finally:
+            self.db.fecharConexao()
 
     def AtualizarEndereco(self, id_endereco: int, novo_endereco: str):
         """
@@ -49,6 +52,7 @@ class Address:
         """
 
         try:
+            self.db.abrirConexao()
             valores_dict = {}
             if id_endereco is not None:
                 valores_dict["id_endereco"] = id_endereco
@@ -60,6 +64,8 @@ class Address:
             )
         except mysql.connector.Error as e:
             print("❌ ocorreu um erro ao atualizar o Endereço.")
+        finally:
+            self.db.fecharConexao()
 
     def buscar_endereco_por_id(
         self, ids_endereco: int | list[int]
@@ -84,7 +90,7 @@ class Address:
             mysql.connector.Error: Se ocorrer erro na consulta ao banco de dados.
         """
         try:
-            self.db.cursor = self.db.connection.cursor(dictionary=True)
+            self.db.abrirConexao()
 
             if isinstance(ids_endereco, list):
                 if not ids_endereco:
@@ -109,8 +115,7 @@ class Address:
             print(f"❌ Erro ao buscar endereço por ID: \n{e}")
             raise
         finally:
-            if hasattr(self.db, "cursor") and self.db.cursor:
-                self.db.cursor.close()
+            self.db.fecharConexao()
 
     def deletarEndereco(self, id_endereco: int):
         """Deleta um endereço do banco de dados.
@@ -122,9 +127,12 @@ class Address:
             mysql.connector.Error: Se ocorrer erro ao deletar o cliente.
         """
         try:
+            self.db.abrirConexao()
             sql = "DELETE FROM enderecos WHERE id_endereco = %s"
             self.db.cursor.execute(sql, (id_endereco,))
             self.db.connection.commit()
             print(f"✅ Endereço com id({id_endereco}) deletado com sucesso.")
         except mysql.connector.Error as e:
             print(f"❌ Erro ao deletar o Endereço: \n {e}")
+        finally:
+            self.db.fecharConexao()
