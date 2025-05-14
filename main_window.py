@@ -1,6 +1,8 @@
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
+
+import mysql, mysql.connector
 from src.models.login import Login as LoginModel
 from src.ui.login_page import LoginPage
 from src.ui.colaboradores_page import ColaboradoresPage
@@ -324,14 +326,23 @@ class Main:
         """Exclui um colaborador após confirmação."""
         if messagebox.askyesno(
             "Confirmar Exclusão",
-            f"Tem certeza que deseja excluir '{nome_colaborador}' (ID: {colab_id})?",
+            f"Tem certeza que deseja excluir '{nome_colaborador}' (CPF: {colab_id})?",
         ):
-            self.colaboradores_data = [
-                c for c in self.colaboradores_data if c.get("id") != colab_id
-            ]
-            messagebox.showinfo("Sucesso", "Colaborador excluído!")
-            # self.salvar_dados_em_arquivo_ou_db() # Persistência
-            self.mostrar_tela("lista_colaboradores")  # Atualiza a lista
+            try:
+                self.colaborador.deletarColaborador(cpf_colaborador=colab_id)
+                messagebox.showinfo("Sucesso", "Colaborador excluído!")
+            except mysql.connector.Error as e:
+                print(f"❌erro ao deletar colaborador")
+                return
+
+            self.recarregarLista()  # Atualiza a lista
+
+    def recarregarLista(self):
+        """metodo para recarregar a lista de colaboradores"""
+        self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
+        self.colaboradores_page.criar_lista_colaboradores(
+            colaboradores_data=self.colaboradores_data
+        )
 
 
 if __name__ == "__main__":

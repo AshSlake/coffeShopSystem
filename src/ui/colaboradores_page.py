@@ -207,6 +207,10 @@ class ColaboradoresPage:
         # Por padrão, volta para a lista de colaboradores.
         self.main_controller.mostrar_tela("lista_colaboradores")
 
+    def _handle_atualizar_lista_colab(self):
+        """chama o metodo para recarregar a lista de colaboradores."""
+        self.main_controller.recarregarLista()
+
     def criar_lista_colaboradores(self, colaboradores_data):
         print("Dados recebidos:", colaboradores_data)
         """Cria a lista de colaboradores recuperando dados do MySQL"""
@@ -318,26 +322,9 @@ class ColaboradoresPage:
         ttk.Button(
             btn_frame,
             text="Atualizar Lista",
-            command=self.criar_lista_colaboradores,  # Agora recarrega os dados diretamente
+            command=self._handle_atualizar_lista_colab,  # Agora recarrega os dados diretamente
             style="TButton",
         ).pack(side="left", padx=5)
-
-    def atualizar_display_lista(self, colaboradores_data):
-        """Limpa e recarrega os dados na Treeview."""
-        if self.tree:
-            for item in self.tree.get_children():
-                self.tree.delete(item)
-            for colab in colaboradores_data:
-                self.tree.insert(
-                    "",
-                    "end",
-                    values=(
-                        colab.get("id", ""),
-                        colab.get("nome", ""),
-                        colab.get("cargo", ""),
-                        colab.get("telefone", ""),
-                    ),
-                )
 
     def _handle_editar_selecionado(self):
         """Solicita ao controller principal para mostrar o formulário de edição."""
@@ -367,9 +354,9 @@ class ColaboradoresPage:
         item_id_str = item_values[0]
         nome_colaborador = item_values[1]
         try:
-            item_id = int(item_id_str)
+            item_id = item_id_str
             self.main_controller.solicitar_exclusao_colaborador(
                 item_id, nome_colaborador
             )
         except (ValueError, TypeError):
-            messagebox.showerror("Erro", f"ID inválido: {item_id_str}")
+            messagebox.showerror("Erro", f"CPF inválido: {item_id_str}")
