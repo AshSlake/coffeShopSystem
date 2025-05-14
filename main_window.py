@@ -1,6 +1,7 @@
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
+from PIL import Image, ImageTk
 
 import mysql, mysql.connector
 from src.models.customer import Customers
@@ -24,6 +25,18 @@ class Main:
         self.root = root
         self.root.title(titulo)
         self.root.geometry(dimensao)
+
+        largura, altura = 1000, 650
+        # backgroud image
+        imagem_backgroud = Image.open("src/public/coffeshop.jpg").convert("RGBA")
+        # Redimensiona a imagem para o tamanho da janela
+        imagem_backgroud = imagem_backgroud.resize(
+            (largura, altura), Image.Resampling.LANCZOS
+        )
+        alpha = int(255 * 0.3)
+        # criando mascara
+        imagem_backgroud.putalpha(alpha)
+        self._bg_photo = ImageTk.PhotoImage(imagem_backgroud)
 
         self._definir_cores_e_fontes()
         self.style = ttk.Style(self.root)
@@ -231,8 +244,14 @@ class Main:
         self.mostrar_tela("login")
 
     def limpar_container(self):
+        # destrói tudo
         for widget in self.container.winfo_children():
             widget.destroy()
+        # redesenha o background
+        bg_label = tk.Label(self.container, image=self._bg_photo)
+        bg_label.place(relx=0, rely=0, relwidth=1, relheight=1)
+        # mantém uma referência para não ser coletado pelo garbage collector
+        bg_label.image = self._bg_photo
 
     def mostrar_tela(self, nome_tela, modo="visualizar", data_extra=None):
         self.limpar_container()

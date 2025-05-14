@@ -24,7 +24,6 @@ class ClientPage:
         self.cargo_combobox = None
 
     def criar_form_clientes(self, modo="novo", data_colaborador=None):
-        print(data_colaborador)
         self.limpar_container()
         self._id_colaborador_editando_form = None
 
