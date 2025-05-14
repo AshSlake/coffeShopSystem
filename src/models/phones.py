@@ -7,11 +7,11 @@ class Phones:
     def __init__(self, db: Database):
         self.db = db
 
-    def inserirTelefone(self, novo_numero: int):
+    def inserirTelefone(self, novo_numero: str):
         """Insere um novo número de telefone.
 
         Args:
-            novo_numero (int): Número de telefone.
+            novo_numero (str): Número de telefone.
         Returns:
             int: ID do telefone recém-inserido.
 

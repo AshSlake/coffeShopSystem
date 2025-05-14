@@ -67,7 +67,9 @@ class Collaborator:
             #     print("⚠️ Todos os campos precisam ser preenchidos para a inserção.")
             #     return
         except mysql.connector.Error as e:
-            print(f"❌ Erro ao inserir um novo colaborador: \n{e}")
+            self.phones.deletarTelefone(self.fk_telefone)
+            self.address.deletarEndereco(self.fk_endereco)
+            raise ValueError(f"❌ Erro ao inserir um novo colaborador: \n{e}")
 
     def atualizarColaborador(
         self,
@@ -165,3 +167,37 @@ class Collaborator:
             print(f"✅ Colaborador com CPF:({cpf_colaborador}) excluído com sucesso.")
         except mysql.connector.Error as e:
             print(f"❌ Erro ao excluir o colaborador:\n{e}")
+
+    def cpf_existe(self, cpf: str) -> bool:
+        """
+         Verifica se um CPF já está cadastrado no banco de dados.
+
+        Args:
+            cpf (str): CPF a ser verificado (com ou sem formatação)
+
+        Returns:
+            bool: True se o CPF existe, False se não existe ou em caso de erro
+
+        Raises:
+            ValueError: Se o CPF for inválido
+        """
+        try:
+            # Remove caracteres não numéricos e valida formato básico
+            cpf_limpo = "".join(filter(str.isdigit, cpf))
+            if len(cpf_limpo) != 11:
+                raise ValueError("CPF deve conter 11 dígitos")
+
+            # Consulta segura com parâmetros para evitar SQL injection
+            sql = "SELECT COUNT(1) FROM colaboradores WHERE cpf = %s"
+            self.db.cursor.execute(sql, (cpf_limpo,))
+
+            # Obtém o resultado (fetchone retorna uma tupla, ex: (1,))
+            resultado = self.db.cursor.fetchone()
+
+            # Retorna True se count > 0
+            return resultado[0] > 0 if resultado else False
+
+        except Exception as e:
+            # Log do erro (opcional)
+            print(f"Erro ao verificar CPF: {str(e)}")
+            return False
