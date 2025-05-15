@@ -314,7 +314,7 @@ class Main:
             self.container,
             text=f"Bem-vindo, {nome_pessoa} ao Sistema CoffeeShop",
             style="Welcome.TLabel",
-        ).pack(pady=150, padx=20)
+        ).pack(pady=250, padx=20)
 
     # --- Métodos de Controle de Login ---
     def tentar_login(self, cpf, senha):

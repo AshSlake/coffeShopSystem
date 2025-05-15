@@ -142,9 +142,9 @@ class ClientPage:
         self.tree.heading("telefone", text="Telefone", anchor="w")
 
         # Configura as colunas
-        self.tree.column("cpf", width=120, stretch=False)
-        self.tree.column("nome", width=200, stretch=True)
-        self.tree.column("telefone", width=120, stretch=False)
+        self.tree.column("cpf", width=200, stretch=False)
+        self.tree.column("nome", width=250, stretch=True)
+        self.tree.column("telefone", width=250, stretch=False)
 
         self.tree.pack(fill="both", expand=True)
 
