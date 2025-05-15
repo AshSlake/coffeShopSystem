@@ -5,6 +5,7 @@ from PIL import Image, ImageTk
 
 import mysql, mysql.connector
 from src.models.customer import Customers
+from src.models.dishes import Dishes
 from src.models.login import Login as LoginModel
 from src.ui.cliente_page import ClientPage
 from src.ui.login_page import LoginPage
@@ -13,6 +14,7 @@ from src.database.connectFromDB import Database as db
 from src.models.phones import Phones
 from src.models.address import Address
 from src.models.collaborator import Collaborator
+from src.ui.pratos_page import PratosPage
 from src.utils.verificadorCpf import validar_cpf
 from src.utils.verificadorEndereco import validar_endereco
 from src.utils.verificarTelefone import formatar_telefone, validar_telefone_celular
@@ -54,8 +56,14 @@ class Main:
             None  # ID do colaborador sendo editado (se houver)
         )
 
-        # Modelos
+        # Models
         self.login_model = LoginModel()
+        self.db = db()
+        self.telefone = Phones(self.db)
+        self.endereco = Address(self.db)
+        self.colaborador = Collaborator()
+        self.cliente = Customers(self.db, self.telefone)
+        self.dishes = Dishes(self.db)
 
         # Views (Páginas da UI)
         # View Login
@@ -72,19 +80,25 @@ class Main:
             main_controller=self,  # Passa a instância de Main
             cor_fundo_janela=self.cor_fundo_janela,
         )
+        # View para Clientes
         self.client_page = ClientPage(
             container=self.container,
             limpar_container=self.limpar_container,
             main_controller=self,  # Passa a instância de Main
             cor_fundo_janela=self.cor_fundo_janela,
         )
-        self.db = db()
-        self.telefone = Phones(self.db)
-        self.endereco = Address(self.db)
-        self.colaborador = Collaborator()
-        self.cliente = Customers(self.db, self.telefone)
+        # View para Pratos
+        self.prato_page = PratosPage(
+            container=self.container,
+            limpar_container=self.limpar_container,
+            main_controller=self,  # Passa a instância de Main
+            cor_fundo_janela=self.cor_fundo_janela,
+        )
+
+        # Carregar datas
         self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
         self.cliente_data = self.cliente.recuperar_clientes_completos()
+        self.pratos_data = self.dishes.recuperar_pratos_completos()
 
         # Iniciar com a tela de login
         self.mostrar_tela("login")
@@ -234,6 +248,23 @@ class Main:
             command=lambda: self.mostrar_tela("lista_clientes"),
         )
         barra_menu.add_cascade(label="Clientes", menu=menu_cliente)
+        # Menu Prato
+        menu_pratos = tk.Menu(
+            barra_menu,
+            tearoff=0,
+            bg=self.cor_fundo_frame,
+            fg=self.cor_texto_escuro,
+            font=self.fonte_label,
+        )
+        menu_pratos.add_command(
+            label="Cadastrar Novo Prato",
+            command=lambda: self.mostrar_tela("form_prato", modo="novo"),
+        )
+        menu_pratos.add_command(
+            label="Pratos",
+            command=lambda: self.mostrar_tela("lista_pratos"),
+        )
+        barra_menu.add_cascade(label="Pratos", menu=menu_pratos)
 
     # Reseta todos os dados do usuario atual e desliga o menu
     def acao_sair(self):
@@ -267,6 +298,10 @@ class Main:
             self.client_page.criar_form_clientes(modo, data_extra)
         elif nome_tela == "lista_clientes":
             self.client_page.criar_lista_clientes(self.cliente_data)
+        elif nome_tela == "form_prato":
+            self.prato_page.criar_form_pratos(modo, data_extra)
+        elif nome_tela == "lista_pratos":
+            self.prato_page.criar_lista_pratos(self.pratos_data)
         elif nome_tela == "tela_inicial":
             nome_pessoa = self.dados_usuario_logado["pessoa"]["nome"]
             self.mostrar_tela_inicial_conteudo(nome_pessoa)
@@ -500,6 +535,72 @@ class Main:
         """metodo para recarregar a lista de colaboradores"""
         self.cliente_data = self.cliente.recuperar_clientes_completos()
         self.client_page.criar_lista_clientes(clientes_data=self.cliente_data)
+
+    # --- Métodos de Controle dos Pratos ---
+
+    def recuperar_ingredientes(self) -> list:
+        """
+        Retorna lista de ingredientes disponíveis para seleção.
+        """
+        try:
+            return self.dishes.recuperar_ingredientes()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao recuperar ingredientes: {e}")
+            return []
+
+    def recarregarListaPratos(self):
+        """Recarrega dados e atualiza a lista de pratos."""
+        self.pratos_data = self.dishes.recuperar_pratos_completos()
+        self.prato_page.criar_lista_pratos(self.pratos_data)
+
+    def solicitar_edicao_prato(self, prato_id):
+        """Mostra o formulário preenchido para edição de um prato."""
+        prato = next((p for p in self.pratos_data if p["id"] == prato_id), None)
+        print(prato)
+        if not prato:
+            messagebox.showerror("Erro", "Prato não encontrado.")
+            return
+        data_form = {
+            "id": prato["id"],
+            "nome": prato["nome"],
+            "preco": prato["preco"],
+            "ingredientes": prato.get("ingredientes", ""),
+        }
+        self.prato_page.criar_form_pratos(modo="editar", data_prato=data_form)
+
+    def solicitar_exclusao_prato(self, prato_id):
+        """Exclui um prato após confirmação."""
+        if messagebox.askyesno("Confirmar Exclusão", f"Excluir prato ID {prato_id}?"):
+            success = self.dishes.deletarPrato(prato_id)
+            if success:
+                messagebox.showinfo("Sucesso", "Prato excluído.")
+                self.recarregarListaPratos()
+
+    def salvar_dados_prato(self, dados_prato, modo: str):
+        """Salva ou atualiza um prato e suas associações de ingredientes."""
+        prato_id = dados_prato.get("id")
+        nome = dados_prato.get("nome")
+        preco = dados_prato.get("preco")
+        ingredientes = dados_prato.get("ingredientes", [])
+        if not nome or not preco or not ingredientes:
+            messagebox.showerror(
+                "Erro", "Todos os campos e ingredientes são obrigatórios."
+            )
+            return
+        if modo == "novo":
+            prato_id = self.dishes.inserirPrato(nome, float(preco))
+            for ing_id in ingredientes:
+                self.dishes.adicionarIngredienteAoPrato(prato_id, ing_id)
+        else:
+            # atualiza dados do prato
+            self.dishes.atualizarPrato(
+                id_prato=prato_id, novo_nome=nome, novo_preco=float(preco)
+            )
+            # atualiza ingredientes: remove todos e reinsere
+            for ing_id in ingredientes:
+                self.dishes.removerIngredienteDoPrato(prato_id, ing_id)
+                self.dishes.adicionarIngredienteAoPrato(prato_id, ing_id)
+        self.recarregarListaPratos()
 
 
 if __name__ == "__main__":

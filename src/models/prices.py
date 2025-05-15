@@ -22,6 +22,7 @@ class Prices:
             mysql.connector.Error: Se ocorrer um erro ao executar a inserção no banco.
         """
         try:
+            self.db.abrirConexao()
             sql = "INSERT INTO Precos (preco) VALUES (%s)"
             self.db.cursor.execute(sql, (preco,))
             self.db.connection.commit()
@@ -31,27 +32,25 @@ class Prices:
         except mysql.connector.Error as e:
             print(f"❌ Erro ao inserir preço: \n{e}")
             return None
+        finally:
+            self.db.fecharConexao()
 
-    def atualizarPreco(self, id_preco: int, novo_preco: float):
+    def atualizarPreco(self, id_preco, novo_preco):
         """
-        Atualiza o valor de um preço existente.
-
-        Args:
-            id_preco (int): O ID do preço a ser atualizado.
-            novo_preco (float): O novo valor do preço.
-
-        Returns:
-            bool: True se a atualização foi bem-sucedida, False caso contrário.
-
-        Raises:
-            mysql.connector.Error: Se ocorrer um erro durante a atualização.
+        Atualiza o valor de um preço na tabela Precos.
         """
         try:
-            self.db.atualizarRegistro("Precos", {"preco": novo_preco}, "id", id_preco)
+            # 🔒 Corrige se estiver vindo como lista
+            if isinstance(novo_preco, list):
+                novo_preco = novo_preco[0]
+            if isinstance(id_preco, list):
+                id_preco = id_preco[0]
+
+            valores_dict = {"preco": float(novo_preco)}
+            self.db.atualizarRegistro("Precos", valores_dict, "id", id_preco)
             return True
         except mysql.connector.Error as e:
-            # O método atualizarRegistro já imprime o erro.
-            # print(f"❌ Erro ao atualizar preço (ID: {id_preco}): \n{e}")
+            print(f"❌ Erro ao atualizar preço (ID: {id_preco}): \n{e}")
             return False
 
     def deletarPreco(self, id_preco: int):
@@ -71,6 +70,7 @@ class Prices:
             mysql.connector.Error: Se ocorrer um erro durante a deleção.
         """
         try:
+            self.db.abrirConexao()
             sql = "DELETE FROM Precos WHERE id = %s"
             self.db.cursor.execute(sql, (id_preco,))
             self.db.connection.commit()
@@ -83,3 +83,5 @@ class Prices:
         except mysql.connector.Error as e:
             print(f"❌ Erro ao deletar preço (ID: {id_preco}): \n{e}")
             return False
+        finally:
+            self.db.fecharConexao()
