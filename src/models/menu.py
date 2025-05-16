@@ -20,9 +20,7 @@ class Menu:
             mysql.connector.Error: Se ocorrer um erro ao executar a inserção no banco.
         """
         try:
-            # Como a tabela Cardapio só tem ID (PK, assumed auto_increment),
-            # um insert sem colunas específicas ou com DEFAULT VALUES funciona.
-            # Para MySQL, se 'id' é AUTO_INCREMENT:
+            self.db.abrirConexao()
             sql = "INSERT INTO Cardapio () VALUES ()"  # Ou "INSERT INTO Cardapio (id) VALUES (NULL)"
             self.db.cursor.execute(sql)
             self.db.connection.commit()
@@ -32,6 +30,8 @@ class Menu:
         except mysql.connector.Error as e:
             print(f"❌ Erro ao criar novo cardápio: \n{e}")
             return None
+        finally:
+            self.db.fecharConexao()
 
     def adicionarPratoAoCardapio(self, cardapio_id: int, prato_id: int):
         """
@@ -48,6 +48,7 @@ class Menu:
             mysql.connector.Error: Se ocorrer um erro durante a inserção na tabela de junção.
         """
         try:
+            self.db.abrirConexao()
             sql = "INSERT INTO Cardapio_Pratos (cardapio_id, prato_id) VALUES (%s, %s)"
             self.db.cursor.execute(sql, (cardapio_id, prato_id))
             self.db.connection.commit()
@@ -60,6 +61,8 @@ class Menu:
                 f"❌ Erro ao adicionar prato (ID: {prato_id}) ao Cardápio (ID: {cardapio_id}): \n{e}"
             )
             return False
+        finally:
+            self.db.fecharConexao()
 
     def removerPratoDoCardapio(self, cardapio_id: int, prato_id: int):
         """
@@ -76,6 +79,7 @@ class Menu:
             mysql.connector.Error: Se ocorrer um erro durante a deleção na tabela de junção.
         """
         try:
+            self.db.abrirConexao()
             sql = "DELETE FROM Cardapio_Pratos WHERE cardapio_id = %s AND prato_id = %s"
             self.db.cursor.execute(sql, (cardapio_id, prato_id))
             self.db.connection.commit()
@@ -94,6 +98,8 @@ class Menu:
                 f"❌ Erro ao remover prato (ID: {prato_id}) do Cardápio (ID: {cardapio_id}): \n{e}"
             )
             return False
+        finally:
+            self.db.fecharConexao()
 
     def deletarCardapio(self, id_cardapio: int):
         """
@@ -109,7 +115,7 @@ class Menu:
             mysql.connector.Error: Se ocorrer um erro durante a deleção.
         """
         try:
-            self.db.connection.start_transaction()
+            self.db.abrirConexao()
             # Remover de Cardapio_Pratos primeiro
             sql_remove_assoc = "DELETE FROM Cardapio_Pratos WHERE cardapio_id = %s"
             self.db.cursor.execute(sql_remove_assoc, (id_cardapio,))
@@ -132,3 +138,53 @@ class Menu:
             self.db.connection.rollback()
             print(f"❌ Erro ao deletar cardápio (ID: {id_cardapio}): \n{e}")
             return False
+        finally:
+            self.db.fecharConexao()
+
+    def recuperar_cardapio_completo(self) -> dict:
+        """
+        Busca no banco de dados todos os pratos associados ao último cardápio criado,
+        incluindo seus preços.
+
+        Returns:
+            dict: {
+                'id': ultimo_cardapio_id
+                'pratos': [
+                    {'id': int, 'nome': str, 'preco': Decimal},
+                    ...
+                ]
+            }
+        """
+        try:
+            # Primeiro pegamos o ultimo id do cardapio no banco,levamos em consideração que o cardapio utilizado é o ultimo
+            self.db.abrirConexao()
+            sql_max = "SELECT MAX(id) FROM cardapio"
+            self.db.cursor.execute(sql_max)
+            result = self.db.cursor.fetchone()
+            if not result or result["MAX(id)"] is None:
+                return {"id": None, "pratos": []}
+            ultimo_id = result["MAX(id)"]
+
+            # Após pega o ultimo id do fazemos dois JOIN para juntar os dados dos pratos apartir da tabela cardapio_pratos
+            sql = (
+                "SELECT p.id, p.nome, pr.preco AS preco "
+                "FROM Pratos p "
+                "JOIN Cardapio_Pratos cp ON p.id = cp.prato_id "
+                "JOIN Precos pr ON p.fk_preco = pr.id "
+                "WHERE cp.cardapio_id = %s"
+            )
+            self.db.cursor.execute(sql, (ultimo_id,))
+            rows = self.db.cursor.fetchall()
+            print(f"pratos encontrados: {rows}")
+            pratos = [
+                {"id": row["id"], "nome": row["nome"], "preco": row["preco"]}
+                for row in rows
+            ]
+
+            return {"id": ultimo_id, "pratos": pratos}
+
+        except mysql.connector.Error as e:
+            print(f"❌ Erro ao recuperar último cardápio completo: \n{e}")
+            return {"id": None, "pratos": []}
+        finally:
+            self.db.fecharConexao()

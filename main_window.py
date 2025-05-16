@@ -7,6 +7,8 @@ import mysql, mysql.connector
 from src.models.customer import Customers
 from src.models.dishes import Dishes
 from src.models.login import Login as LoginModel
+from src.models.menu import Menu
+from src.ui.cardapio_page import CardapioPage
 from src.ui.cliente_page import ClientPage
 from src.ui.login_page import LoginPage
 from src.ui.colaboradores_page import ColaboradoresPage
@@ -17,6 +19,7 @@ from src.models.collaborator import Collaborator
 from src.ui.pratos_page import PratosPage
 from src.utils.verificadorCpf import validar_cpf
 from src.utils.verificadorEndereco import validar_endereco
+from src.utils.verificadorPreco import verificar_preco
 from src.utils.verificarTelefone import formatar_telefone, validar_telefone_celular
 
 
@@ -64,6 +67,7 @@ class Main:
         self.colaborador = Collaborator()
         self.cliente = Customers(self.db, self.telefone)
         self.dishes = Dishes(self.db)
+        self.menu = Menu(self.db)
 
         # Views (Páginas da UI)
         # View Login
@@ -94,14 +98,33 @@ class Main:
             main_controller=self,  # Passa a instância de Main
             cor_fundo_janela=self.cor_fundo_janela,
         )
+        # View para Cardapio
+        self.cardapio_page = CardapioPage(
+            container=self.container,
+            limpar_container=self.limpar_container,
+            main_controller=self,  # Passa a instância de Main
+            cor_fundo_janela=self.cor_fundo_janela,
+        )
 
         # Carregar datas
-        self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
-        self.cliente_data = self.cliente.recuperar_clientes_completos()
-        self.pratos_data = self.dishes.recuperar_pratos_completos()
+        self.colaboradores_data = None
+        self.cliente_data = None
+        self.pratos_data = None
+        self.cardapio_data = None
+        self.reload_data()
 
         # Iniciar com a tela de login
         self.mostrar_tela("login")
+
+    def reload_data(self):
+        """
+        Recarrega todas as datas para sempre ficar com os dados atualizados
+
+        """
+        self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
+        self.cliente_data = self.cliente.recuperar_clientes_completos()
+        self.pratos_data = self.dishes.recuperar_pratos_completos()
+        self.cardapio_data = self.menu.recuperar_cardapio_completo()
 
     # Styles:
     def _definir_cores_e_fontes(self):
@@ -265,6 +288,19 @@ class Main:
             command=lambda: self.mostrar_tela("lista_pratos"),
         )
         barra_menu.add_cascade(label="Pratos", menu=menu_pratos)
+        # Menu Cardapio:
+        menu_cardapio = tk.Menu(
+            barra_menu,
+            tearoff=0,
+            bg=self.cor_fundo_frame,
+            fg=self.cor_texto_escuro,
+            font=self.fonte_label,
+        )
+        menu_cardapio.add_command(
+            label="Mostrar Cardapio",
+            command=lambda: self.mostrar_tela("mostrar_cardapio"),
+        )
+        barra_menu.add_cascade(label="Cardapio", menu=menu_cardapio)
 
     # Reseta todos os dados do usuario atual e desliga o menu
     def acao_sair(self):
@@ -302,6 +338,8 @@ class Main:
             self.prato_page.criar_form_pratos(modo, data_extra)
         elif nome_tela == "lista_pratos":
             self.prato_page.criar_lista_pratos(self.pratos_data)
+        elif nome_tela == "mostrar_cardapio":
+            self.cardapio_page.criar_lista_cardapio(self.cardapio_data)
         elif nome_tela == "tela_inicial":
             nome_pessoa = self.dados_usuario_logado["pessoa"]["nome"]
             self.mostrar_tela_inicial_conteudo(nome_pessoa)
@@ -582,11 +620,16 @@ class Main:
         nome = dados_prato.get("nome")
         preco = dados_prato.get("preco")
         ingredientes = dados_prato.get("ingredientes", [])
+
         if not nome or not preco or not ingredientes:
             messagebox.showerror(
                 "Erro", "Todos os campos e ingredientes são obrigatórios."
             )
             return
+
+        # Verificar se o preço é válido
+        preco = verificar_preco(preco)
+
         if modo == "novo":
             prato_id = self.dishes.inserirPrato(nome, float(preco))
             for ing_id in ingredientes:
@@ -601,6 +644,53 @@ class Main:
                 self.dishes.removerIngredienteDoPrato(prato_id, ing_id)
                 self.dishes.adicionarIngredienteAoPrato(prato_id, ing_id)
         self.recarregarListaPratos()
+
+    # --- Método de controle do Cardapio ---
+    def recarregar_pratos_cardapio(self):
+        self.reload_data()
+        data = self.cardapio_data
+        self.cardapio_page.criar_lista_cardapio(data)
+
+    def adicionar_prato_ao_cardapio(self):
+        """Controlador para adiionar pratos ao cardapio"""
+        # Faz um filtro dos pratos que não estão no cardapio
+        self.reload_data()
+        cardapio_id = self.cardapio_data["id"]
+        data = [
+            prato
+            for prato in self.pratos_data
+            if prato["id"] not in {p["id"] for p in self.cardapio_data["pratos"]}
+        ]
+
+        self.cardapio_page.criar_view_add_Pratos(
+            cardapio_id=cardapio_id, data_pratos=data
+        )
+
+    def salvar_prato_cardapio(self, cardapio_id: int, selected_ids: dict):
+        """
+        Controlador para Salvar novos pratos ao cardapio principal.
+
+        args:
+            selected_ids(dict): dicionario com as chaves dos pratos para inserção
+        """
+        pratos = selected_ids.get("pratos", [])
+        if not selected_ids:
+            messagebox.showerror("Erro", "selecione algum prato.")
+            return
+
+        for prato_id in pratos:
+            self.menu.adicionarPratoAoCardapio(cardapio_id, prato_id)
+
+        self.recarregar_pratos_cardapio()
+
+    def remover_prato_do_cardapio(self, cardapio_id: int, prato_id: int):
+        """
+        Controlador para exclusão de um prato do cardapio
+
+        args:
+            prato_id(int): chave do prato a ser exluido do cardapio
+        """
+        self.menu.removerPratoDoCardapio(cardapio_id, prato_id)
 
 
 if __name__ == "__main__":

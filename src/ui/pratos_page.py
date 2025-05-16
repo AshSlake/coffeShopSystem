@@ -19,16 +19,22 @@ class PratosPage:
         frame = ttk.Frame(self.container, padding=20, style="Background.TFrame")
         frame.pack(fill="both", expand=True)
 
+        # Título
         titulo = "Cadastrar Novo Prato" if modo == "novo" else "Editar Prato"
-        ttk.Label(frame, text=titulo, style="Subtitle.TLabel").grid(
-            row=0, column=0, columnspan=2, pady=(0, 20), sticky="w"
-        )
+        ttk.Label(
+            frame,
+            text=titulo,
+            style="Subtitle.TLabel",
+            background=self.cor_fundo_janela,
+        ).grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="w")
 
+        # Campos: Nome e Preço
         labels_fields = [
             ("Nome:", "nome"),
             ("Preço:", "preco"),
         ]
         self.entries = {}
+
         for i, (label_text, field_key) in enumerate(labels_fields):
             ttk.Label(frame, text=label_text).grid(
                 row=i + 1, column=0, sticky="w", padx=5, pady=8
@@ -37,25 +43,45 @@ class PratosPage:
             entry.grid(row=i + 1, column=1, sticky="ew", padx=5, pady=8)
             self.entries[field_key] = entry
 
-        # Ingredientes (Listbox)
-        ttk.Label(frame, text="Ingredientes:").grid(
-            row=3, column=0, sticky="nw", padx=5, pady=8
+        # Ingredientes
+        ttk.Label(
+            frame,
+            text="Ingredientes:",
+            style="TLabel",
+            background=self.cor_fundo_janela,
+        ).grid(row=3, column=0, sticky="nw", padx=(5, 10), pady=8)
+
+        listbox_frame = ttk.Frame(frame)
+        listbox_frame.grid(row=3, column=1, sticky="nsew", pady=8)
+
+        scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical")
+        self.ing_listbox = tk.Listbox(
+            listbox_frame,
+            selectmode="multiple",
+            height=8,
+            exportselection=False,
+            yscrollcommand=scrollbar.set,
+            bg="#ffffff",
+            relief="solid",
+            borderwidth=1,
         )
-        self.ing_listbox = tk.Listbox(frame, selectmode="multiple", height=6)
-        self.ing_listbox.grid(row=3, column=1, sticky="ew", padx=5, pady=8)
+        scrollbar.config(command=self.ing_listbox.yview)
+        self.ing_listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        frame.columnconfigure(1, weight=1)
 
         ingredientes_disponiveis = self.main_controller.recuperar_ingredientes()
         for ing in ingredientes_disponiveis:
             self.ing_listbox.insert("end", f"{ing['id']} - {ing['nome']}")
 
-        # Preenche se estiver editando
+        # Preenchimento em modo edição
         if modo == "editar" and data_prato:
             self.prato_id_editando = data_prato.get("id")
             self.entries["nome"].insert(0, data_prato.get("nome", ""))
             self.entries["preco"].insert(0, data_prato.get("preco", ""))
 
             ingredientes_str = data_prato.get("ingredientes", "")
-            ingredientes_ids = set()
             for ing_nome in ingredientes_str.split(", "):
                 for i in range(self.ing_listbox.size()):
                     item_text = self.ing_listbox.get(i)
@@ -63,6 +89,7 @@ class PratosPage:
                         self.ing_listbox.selection_set(i)
                         break
 
+        # Botões
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=4, column=0, columnspan=2, pady=(20, 0), sticky="e")
 
@@ -76,9 +103,9 @@ class PratosPage:
         ttk.Button(
             btn_frame,
             text="Cancelar",
-            command=lambda: self._handle_cancelar_form_prato(),
+            command=self._handle_cancelar_form_prato,
             style="TButton",
-        ).pack(side="left")
+        ).pack(side="left", padx=5)
 
     def _handle_salvar_prato(self, modo):
         prato_id = getattr(self, "prato_id_editando", None)
@@ -132,6 +159,7 @@ class PratosPage:
         )
         scrollbar.config(command=self.tree.yview)
 
+        # Cabechalho da lista
         for col, title, width in [
             ("id", "ID", 50),
             ("nome", "Nome", 200),
@@ -144,13 +172,18 @@ class PratosPage:
         self.tree.pack(fill="both", expand=True)
 
         for prato in pratos_data:
+            preco_formatado = (
+                f"R$ {float(prato['preco']):,.2f}".replace(",", "X")
+                .replace(".", ",")
+                .replace("X", ".")
+            )
             self.tree.insert(
                 "",
                 "end",
                 values=(
                     prato["id"],
                     prato["nome"],
-                    prato["preco"],
+                    preco_formatado,
                     prato["ingredientes"],
                 ),
             )
