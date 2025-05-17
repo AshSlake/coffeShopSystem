@@ -166,6 +166,8 @@ class Main:
         self.style.configure(
             "TLabel", background=self.cor_fundo_frame, font=self.fonte_label
         )
+        self.style.configure("TEntry", padding=6)
+        self.style.configure("TButton", padding=6)
         self.style.configure(
             "Title.TLabel",
             background=self.cor_fundo_frame,
@@ -248,6 +250,8 @@ class Main:
         )
         menu_login.add_command(label="Sair", command=self.acao_sair)
         barra_menu.add_cascade(label="Login", menu=menu_login)
+        # Ajustar menu com o nivel do Usuario logado
+        self._filtrar_menu_por_nivel(barra_menu)
         # Menu Colaborador
         menu_colab = tk.Menu(
             barra_menu,
@@ -401,13 +405,31 @@ class Main:
 
     # --- Métodos de Controle de Login ---
     def tentar_login(self, cpf, senha):
-        """Valida o login e atualiza a UI."""
+        """
+        Valida o login antes de liberar o acesso
+        """
+
+        # Primeiro verifica se o usuario está cadastrado como Funcionario:
         dados_usuario = self.login_model.searchDataFromPerson(cpf, colaborador=True)
-        # print(dados_usuario)
         if not dados_usuario or not dados_usuario.get("pessoa"):
-            messagebox.showerror("Erro de Login", "CPF ou senha inválidos.")
+            messagebox.showerror(
+                "Erro de Login", "CPF não encontrado no banco de Dados."
+            )
             return
 
+        # Segundo verifica no banco de dados os valore inseridos
+        validated = self.login_model.validate_login(cpf=cpf, password=senha)
+        print(validated)
+        # --- Caso não encontre o cpf precisaremos inserir o colaborador no Banco de dados ---
+        if not validated["cpf_exists"]:
+            messagebox.showerror("Erro de Login", "CPF não encontrado.")
+            self.criar_frame_senha_colaborador(cpf)
+            return
+        # --- Verifica a senha do Colaborador se coincide com os dados do banco de dados:
+        if not validated["correct_password"]:
+            messagebox.showerror("Erro de Login", "Senha incorreta.")
+            return
+        # --- Caso estiver tudo OK o login é efetuado
         self.usuario_logado = True
         self.dados_usuario_logado = dados_usuario
 
@@ -416,6 +438,124 @@ class Main:
         # Após login bem-sucedido:
         self.mostrar_tela("tela_inicial")
         self.criar_menu()
+
+    def _filtrar_menu_por_nivel(self, barra_menu: tk.Menu):
+        """
+        Ajusta o estado de cada item de menu conforme o nível do usuário.
+        """
+        nivel = self.dados_usuario_logado.get("pessoa", {}).get("nivelSistem")
+
+        permissoes = {
+            1: {"Login", "Colaboradores", "Clientes", "Pratos", "Cardapio", "Pedidos"},
+            2: {"Login", "Colaboradores", "Clientes", "Pratos", "Cardapio", "Pedidos"},
+            3: {"Login", "Clientes", "Pratos", "Cardapio", "Pedidos"},
+            4: {"Login", "Clientes", "Pratos", "Pedidos"},
+            5: {"Login", "Clientes", "Pedidos"},
+            6: {"Login", "Clientes"},
+        }
+        itens_permitidos = permissoes.get(nivel, {"Login"})
+
+        # Para cada entrada no menu
+        last_index = barra_menu.index("end")
+        if last_index is None:
+            return
+
+        for idx in range(last_index + 1):
+            tipo = barra_menu.type(idx)
+            # só cascade e command têm label
+            if tipo in ("cascade", "command"):
+                label = barra_menu.entrycget(idx, "label")
+                # desabilita se não estiver no conjunto
+                state = "normal" if label in itens_permitidos else "disabled"
+                barra_menu.entryconfig(idx, state=state)
+
+    def criar_frame_senha_colaborador(self, cpf: str):
+        """
+        Cria um frame com campos de entrada de senha e confirmação de senha
+        para cadastro de novo colaborador.
+        """
+        self.limpar_container()  # Limpa a tela atual
+
+        frame = ttk.Frame(self.container, padding=30, style="Background.TFrame")
+        frame.pack(fill="both", expand=True)
+
+        # Título
+        ttk.Label(
+            frame,
+            text="🔐 Definir Senha do Colaborador",
+            style="Subtitle.TLabel",
+            anchor="center",
+        ).grid(row=0, column=0, columnspan=2, pady=(0, 25), sticky="nsew")
+
+        # Campo: Nova Senha
+        ttk.Label(frame, text="Nova Senha:", style="TLabel").grid(
+            row=1, column=0, sticky="e", padx=10, pady=8
+        )
+        senha = ttk.Entry(frame, show="*", width=35, style="TEntry")
+        senha.grid(row=1, column=1, sticky="w", padx=10, pady=8)
+
+        # Campo: Confirmar Senha
+        ttk.Label(frame, text="Confirmar Senha:", style="TLabel").grid(
+            row=2, column=0, sticky="e", padx=10, pady=8
+        )
+        confirma_senha = ttk.Entry(frame, show="*", width=35, style="TEntry")
+        confirma_senha.grid(row=2, column=1, sticky="w", padx=10, pady=8)
+
+        # Frame de botões
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=(30, 0), sticky="e")
+
+        ttk.Button(
+            btn_frame,
+            text="💾 Salvar Senha",
+            command=lambda: self._handle_salvar_senha_colaborador(
+                cpf, senha, confirma_senha
+            ),
+            style="TButton",
+        ).pack(side="left", padx=5)
+
+        ttk.Button(
+            btn_frame,
+            text="Cancelar",
+            command=self._handle_cancelar_senha_colaborador,
+            style="TButton",
+        ).pack(side="left", padx=5)
+
+        # Expansão horizontal das colunas para centralizar
+        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(1, weight=2)
+
+    def _handle_salvar_senha_colaborador(
+        self, cpf: str, senha: int, confirma_senha: int
+    ):
+        """
+        Controlador para salvar a senha do novo colaborador
+
+        args:
+            cpf(str): cpf que sera usado de login
+            senha(int): senha do usuario
+            confirma_senha(int): cofirmação da senha
+        """
+        new_password = int(senha.get())
+        confirm_password = int(confirma_senha.get())
+        if not new_password or not confirm_password:
+            messagebox.showwarning(
+                "Campos obrigatórios", "Preencha todos os campos de senha."
+            )
+            return
+
+        if new_password != confirm_password:
+            messagebox.showerror("Erro", "As senhas não coincidem.")
+            return
+
+        self.login_model.add_login(cpf, new_password)
+        self.mostrar_tela(nome_tela="login")
+
+    def _handle_cancelar_senha_colaborador(self):
+        """
+        Controlador para cancelar a inserção da nova senha
+        """
+        self.mostrar_tela(nome_tela="login")
 
     # --- Métodos de Controle de Colaboradores ---
     def salvar_dados_colaborador(self, dados_colaborador, modo: str):

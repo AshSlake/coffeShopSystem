@@ -27,38 +27,63 @@ class Login:
             cpf (str): CPF do usuário (somente números).
             password (str): Senha do usuário.
         """
-        sql = "INSERT INTO Login (cpf, senha) VALUES (%s, %s)"
-        params = (cpf, password)
-        self.db.cursor.execute(sql, params)
+        try:
+            self.db.abrirConexao()
+            sql = "INSERT INTO login (cpf, senha) VALUES (%s, %s)"
+            params = (
+                cpf,
+                password,
+            )
+            self.db.cursor.execute(sql, params)
+            self.db.connection.commit()
+        except mysql.connector.Error as e:
+            raise ValueError(f"❌ Erro ao inserir login : \a {e}")
+        finally:
+            self.db.fecharConexao()
 
-    def validate_login(self, cpf: str, password: str) -> bool:
+    def validate_login(self, cpf: str, password: str) -> dict:
         """
-        Valida se o login do usuário (CPF e senha) existe na base de dados.
+        Valida se o CPF existe e se a senha está correta.
 
         Args:
-            cpf (str): CPF do usuário.
-            password (str): Senha do usuário.
+        cpf (str): CPF do usuário.
+        password (str): Senha informada pelo usuário.
 
         Returns:
-            bool: True se o usuário existe e os dados estão corretos, False caso contrário.
+        dict: {
+            'cpf_exists': bool,        # True se o CPF estiver cadastrado
+            'correct_password': bool   # True se a senha conferiu (só avaliado se cpf_exists for True)
+        }
 
-        raise:
-            Lança uma exeção mysql.connector.Error caso haja um erro na verificação
+        Raises:
+        mysql.connector.Error: Em caso de falha na consulta ao banco.
         """
         try:
-            if not self.db.connection.is_connected():
-                self.db.connection.reconnect()
-                self.db.cursor = self.db.connection.cursor(dictionary=True)
+            self.db.abrirConexao()
 
-            sql = "SELECT * FROM login WHERE cpf = %s AND senha = %s"
-            params = (cpf, password)
-            self.db.cursor.execute(sql, params)
-            resultado = self.db.cursor.fetchone()
-            self.db.fecharConexao()
-            return resultado if resultado else None
+            # 1) Verifica existência do CPF e obtém a senha cadastrada
+            sql = "SELECT senha FROM login WHERE cpf = %s"
+            self.db.cursor.execute(sql, (cpf,))
+            row = self.db.cursor.fetchone()
+
+            # Se não achou, retorna flags: CPF não existe
+            if row is None:
+                return {"cpf_exists": False, "correct_password": False}
+
+            # CPF existe
+            db_senha = row["senha"]
+
+            # 2) Compara senhas
+            correct = str(password) == str(db_senha)
+
+            return {"cpf_exists": True, "correct_password": correct}
+
         except mysql.connector.Error as e:
+            # propagando erro de banco
+            raise RuntimeError(f"Erro ao verificar login: {e.msg}") from e
+
+        finally:
             self.db.fecharConexao()
-            raise ValueError(f"❌ Erro ao verificar login : \a {e}")
 
     def searchDataFromPerson(self, cpf: str, colaborador: bool = True) -> dict:
         """Metodo para recuperar os dados de uma pessoa do banco
