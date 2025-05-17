@@ -250,8 +250,6 @@ class Main:
         )
         menu_login.add_command(label="Sair", command=self.acao_sair)
         barra_menu.add_cascade(label="Login", menu=menu_login)
-        # Ajustar menu com o nivel do Usuario logado
-        self._filtrar_menu_por_nivel(barra_menu)
         # Menu Colaborador
         menu_colab = tk.Menu(
             barra_menu,
@@ -329,6 +327,9 @@ class Main:
             command=lambda: self.mostrar_tela("lista_pedidos"),
         )
         barra_menu.add_cascade(label="Pedidos", menu=menu_pedidos)
+
+        # Ajustar menu com o nivel do Usuario logado
+        self._filtrar_menu_por_nivel(barra_menu)
 
     # Reseta todos os dados do usuario atual e desliga o menu
     def acao_sair(self):
