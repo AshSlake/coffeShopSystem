@@ -175,7 +175,7 @@ class Menu:
             )
             self.db.cursor.execute(sql, (ultimo_id,))
             rows = self.db.cursor.fetchall()
-            print(f"pratos encontrados: {rows}")
+            # print(f"pratos encontrados: {rows}")
             pratos = [
                 {"id": row["id"], "nome": row["nome"], "preco": row["preco"]}
                 for row in rows

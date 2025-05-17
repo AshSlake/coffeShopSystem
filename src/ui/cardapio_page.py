@@ -102,7 +102,7 @@ class CardapioPage:
 
     def criar_view_add_Pratos(self, cardapio_id: int, data_pratos=None):
         self.limpar_container()
-        print(data_pratos)
+        # print(data_pratos)
 
         frame = ttk.Frame(self.container, padding=20, style="Background.TFrame")
         frame.pack(fill="both", expand=True)

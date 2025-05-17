@@ -129,17 +129,28 @@ class Database:
         try:
             self.abrirConexao()
 
+            if not valores_dict:
+                print("⚠️ Nenhum valor fornecido para atualizar.")
+                return False
+
+            # Prepara os campos e valores
             campos_sql = [f"`{campo}` = %s" for campo in valores_dict.keys()]
             valores = list(valores_dict.values())
             valores.append(valor_where)
 
-            # Usar backticks para evitar conflitos com palavras reservadas e SQL injection em nomes de colunas/tabelas
+            # Comando SQL seguro
             sql = f"UPDATE `{tabela}` SET {', '.join(campos_sql)} WHERE `{campo_where}` = %s"
 
-            self.cursor.execute(sql, tuple(valores))
-            self.connection.commit()
-            print(f"✅ Registro atualizado com sucesso na tabela '{tabela}'!")
-            return True
+            try:
+                self.cursor.execute(sql, tuple(valores))
+                self.connection.commit()
+                print(f"✅ Registro atualizado com sucesso na tabela '{tabela}'!")
+                return True
+            except mysql.connector.Error as e:
+                print(f"❌ Erro ao atualizar registro na tabela '{tabela}': {e.msg}")
+                return False
+            finally:
+                self.fecharConexao()
 
         except mysql.connector.Error as e:
             print(f"❌ Erro ao atualizar registro na tabela '{tabela}':\n{e}")

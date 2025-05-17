@@ -108,7 +108,7 @@ class ColaboradoresPage:
 
         # Preencher dados se estiver editando
         if modo == "editar" and data_colaborador:
-            print(data_colaborador)
+            # print(data_colaborador)
             self.entries["cpf"].insert(0, data_colaborador.get("cpf", ""))
             self.entries["nome"].insert(0, data_colaborador.get("nome", ""))
             self.entries["telefone"].insert(
@@ -216,7 +216,7 @@ class ColaboradoresPage:
         self.main_controller.recarregarLista()
 
     def criar_lista_colaboradores(self, colaboradores_data):
-        print("Dados recebidos:", colaboradores_data)
+        # print("Dados recebidos:", colaboradores_data)
         """Cria a lista de colaboradores recuperando dados do MySQL"""
 
         self.limpar_container()

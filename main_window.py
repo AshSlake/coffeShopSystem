@@ -8,6 +8,7 @@ from src.models.customer import Customers
 from src.models.dishes import Dishes
 from src.models.login import Login as LoginModel
 from src.models.menu import Menu
+from src.models.orders import Orders
 from src.ui.cardapio_page import CardapioPage
 from src.ui.cliente_page import ClientPage
 from src.ui.login_page import LoginPage
@@ -16,6 +17,7 @@ from src.database.connectFromDB import Database as db
 from src.models.phones import Phones
 from src.models.address import Address
 from src.models.collaborator import Collaborator
+from src.ui.pedido_page import PedidoPage
 from src.ui.pratos_page import PratosPage
 from src.utils.verificadorCpf import validar_cpf
 from src.utils.verificadorEndereco import validar_endereco
@@ -54,10 +56,7 @@ class Main:
         # Estado da aplicação
         self.usuario_logado = False
         self.dados_usuario_logado = None
-
-        self._id_colaborador_editando = (
-            None  # ID do colaborador sendo editado (se houver)
-        )
+        self._id_colaborador_editando = None
 
         # Models
         self.login_model = LoginModel()
@@ -68,6 +67,7 @@ class Main:
         self.cliente = Customers(self.db, self.telefone)
         self.dishes = Dishes(self.db)
         self.menu = Menu(self.db)
+        self.order = Orders(self.db)
 
         # Views (Páginas da UI)
         # View Login
@@ -105,12 +105,21 @@ class Main:
             main_controller=self,  # Passa a instância de Main
             cor_fundo_janela=self.cor_fundo_janela,
         )
+        # View Pedidos
+        self.orderPage = PedidoPage(
+            container=self.container,
+            limpar_container=self.limpar_container,
+            main_controller=self,  # Passa a instância de Main
+            cor_fundo_janela=self.cor_fundo_janela,
+        )
 
         # Carregar datas
         self.colaboradores_data = None
         self.cliente_data = None
         self.pratos_data = None
+        self.pratos_pedido_data = None
         self.cardapio_data = None
+        self.pedidos_data = None
         self.reload_data()
 
         # Iniciar com a tela de login
@@ -125,6 +134,7 @@ class Main:
         self.cliente_data = self.cliente.recuperar_clientes_completos()
         self.pratos_data = self.dishes.recuperar_pratos_completos()
         self.cardapio_data = self.menu.recuperar_cardapio_completo()
+        self.pedidos_data = self.order.recuperar_pedidos()
 
     # Styles:
     def _definir_cores_e_fontes(self):
@@ -151,6 +161,7 @@ class Main:
             font=self.fonte_label,
         )
         self.style.configure("TFrame", background=self.cor_fundo_frame)
+        self.style.configure("Bold.TLabel", font=("Helvetica", 10, "bold"))
         self.style.configure("Background.TFrame", background=self.cor_fundo_janela)
         self.style.configure(
             "TLabel", background=self.cor_fundo_frame, font=self.fonte_label
@@ -301,6 +312,19 @@ class Main:
             command=lambda: self.mostrar_tela("mostrar_cardapio"),
         )
         barra_menu.add_cascade(label="Cardapio", menu=menu_cardapio)
+        # Pedidos:
+        menu_pedidos = tk.Menu(
+            barra_menu,
+            tearoff=0,
+            bg=self.cor_fundo_frame,
+            fg=self.cor_texto_escuro,
+            font=self.fonte_label,
+        )
+        menu_pedidos.add_command(
+            label="Mostrar Pedidos",
+            command=lambda: self.mostrar_tela("lista_pedidos"),
+        )
+        barra_menu.add_cascade(label="Pedidos", menu=menu_pedidos)
 
     # Reseta todos os dados do usuario atual e desliga o menu
     def acao_sair(self):
@@ -322,24 +346,45 @@ class Main:
 
     def mostrar_tela(self, nome_tela, modo="visualizar", data_extra=None):
         self.limpar_container()
+        self.reload_data()
         if nome_tela == "form_colaborador":
             # 'data_extra' aqui seria os dados do colaborador para edição
             self.colaboradores_page.criar_form_colaborador(modo, data_extra)
         elif nome_tela == "lista_colaboradores":
             # Passa a lista de dados atual para a página de colaboradores
             self.colaboradores_page.criar_lista_colaboradores(self.colaboradores_data)
+
+            # login
         elif nome_tela == "login":
             self.login_page.criar_tela_login()
+
+            # cliente
         elif nome_tela == "form_cliente":
             self.client_page.criar_form_clientes(modo, data_extra)
         elif nome_tela == "lista_clientes":
             self.client_page.criar_lista_clientes(self.cliente_data)
+
+            # pratos
         elif nome_tela == "form_prato":
             self.prato_page.criar_form_pratos(modo, data_extra)
         elif nome_tela == "lista_pratos":
             self.prato_page.criar_lista_pratos(self.pratos_data)
+
+            # cardapio
         elif nome_tela == "mostrar_cardapio":
             self.cardapio_page.criar_lista_cardapio(self.cardapio_data)
+
+            # Pedidos
+        elif nome_tela == "lista_pedidos":
+            self.orderPage.criar_lista_pedidos(pedidos_data=self.pedidos_data)
+        elif nome_tela == "form_pedido":
+            self.orderPage.criar_form_pedido(
+                modo="novo",
+                data_pratos=self.pratos_data,
+                id_colaborador=self._id_colaborador_editando,
+            )
+
+            # Tela inicial
         elif nome_tela == "tela_inicial":
             nome_pessoa = self.dados_usuario_logado["pessoa"]["nome"]
             self.mostrar_tela_inicial_conteudo(nome_pessoa)
@@ -358,13 +403,15 @@ class Main:
     def tentar_login(self, cpf, senha):
         """Valida o login e atualiza a UI."""
         dados_usuario = self.login_model.searchDataFromPerson(cpf, colaborador=True)
-
+        # print(dados_usuario)
         if not dados_usuario or not dados_usuario.get("pessoa"):
             messagebox.showerror("Erro de Login", "CPF ou senha inválidos.")
             return
 
         self.usuario_logado = True
         self.dados_usuario_logado = dados_usuario
+
+        self._id_colaborador_editando = self.dados_usuario_logado["pessoa"]["cpf"]
 
         # Após login bem-sucedido:
         self.mostrar_tela("tela_inicial")
@@ -442,7 +489,7 @@ class Main:
                 novo_telefone=formated_telefone,
                 novo_endereco=endereco,
             )
-        self.recarregarLista()
+        self.recarregarListaColaboradores()
 
     def solicitar_edicao_colaborador(self, colab_id):
         """Prepara e mostra o formulário para editar um colaborador."""
@@ -467,7 +514,7 @@ class Main:
                 print(f"❌erro ao deletar colaborador")
                 return
 
-            self.recarregarLista()
+            self.recarregarListaColaboradores()
 
     # --- Métodos de Controle de Cliente ---
     def solicitar_edicao_cliente(self, cpf):
@@ -475,7 +522,7 @@ class Main:
 
         # 1) Puxe sempre os dados completos (com telefone_info)
         self.cliente_data = self.cliente.recuperar_clientes_completos()
-        print(self.cliente_data)
+        # print(self.cliente_data)
 
         # 2) Normalize o CPF para string, sem formatação
         cpf_str = "".join(filter(str.isdigit, str(cpf)))
@@ -562,7 +609,7 @@ class Main:
 
         self.recarregarListaCliente()
 
-    def recarregarLista(self):
+    def recarregarListaColaboradores(self):
         """metodo para recarregar a lista de colaboradores"""
         self.colaboradores_data = self.colaborador.recuperar_colaboradores_completos()
         self.colaboradores_page.criar_lista_colaboradores(
@@ -594,7 +641,7 @@ class Main:
     def solicitar_edicao_prato(self, prato_id):
         """Mostra o formulário preenchido para edição de um prato."""
         prato = next((p for p in self.pratos_data if p["id"] == prato_id), None)
-        print(prato)
+        # print(prato)
         if not prato:
             messagebox.showerror("Erro", "Prato não encontrado.")
             return
@@ -691,6 +738,77 @@ class Main:
             prato_id(int): chave do prato a ser exluido do cardapio
         """
         self.menu.removerPratoDoCardapio(cardapio_id, prato_id)
+
+    # --- Métodos de controle dos Pedidos ---
+    def recarregarListaPedidos(self):
+        """Controlador para recarregarar a lista de Pedidos"""
+        self.mostrar_tela(nome_tela="lista_pedidos")
+
+    def criar_pedido(self, data_pedidos: dict):
+        """
+        Controlador para salvar pedidos novos no banco de dados.
+        """
+        # Recuperar dados para inserção
+        num_mesa = data_pedidos["numero_mesa"]
+        fk_colaborador = data_pedidos["id_colaborador"]
+        status = data_pedidos["status"]
+        ids_pratos = data_pedidos["pratos"]
+
+        # Tratamento dos dados
+
+        # validar numero da mesa
+        if not num_mesa.isdigit():
+            messagebox.showerror("Erro", "Número da mesa inválido!")
+            return
+
+        # Validar status
+        if not status:
+            # Por padrão o status inicial é pendente
+            status = "pendente"
+
+        self.order.inserirPedido(num_mesa, fk_colaborador, status, ids_pratos)
+
+    def solicitar_exclusao_pedido(self, pedido_id):
+        """
+        Controlador de exclusão dos pedidos do banco de dados.
+        """
+        self.order.deletarPedido(pedido_id)
+        self.recarregarListaPedidos()
+
+    def solicitar_edicao_pedido(self, pedido_id):
+        """Mostra o formulário preenchido para edição de um pedido."""
+        pedido_id = int(pedido_id)
+        pedido = self.pedidos_data.get(pedido_id)
+        pratos_data = self.dishes.recuperar_pratos_para_pedido(pedido_id)
+
+        if not pratos_data or not pratos_data.get("pratos"):
+            messagebox.showerror(
+                "Erro", "Pedido não encontrado ou sem pratos disponíveis."
+            )
+            return
+
+        self.orderPage.criar_form_pedido(
+            modo="editar",
+            data_pedido=pedido,
+            data_pratos=pratos_data["pratos"],
+            id_colaborador=self._id_colaborador_editando,
+            pedido_id=pedido_id,
+        )
+
+    def atualizar_pedido(self, id_pedido, new_data_pedidos):
+        """
+        Controlador para atualizar um pedido no banco de dados
+        """
+        novo_num_mesa = new_data_pedidos["numero_mesa"]
+        novo_status = new_data_pedidos["status"]
+        novos_pratos = new_data_pedidos["pratos"]
+
+        self.order.atualizarPedido(
+            id_pedido,
+            novo_num_mesa=novo_num_mesa,
+            novo_status=novo_status,
+            novos_pratos=novos_pratos,
+        )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 # SESSÃO PRATOS
+from MySQLdb import DatabaseError, Error
 import mysql, mysql.connector
 
 from src.database.connectFromDB import Database
@@ -226,6 +227,45 @@ class Dishes:
         except mysql.connector.Error as e:
             print(f"❌ Erro ao recuperar pratos completos:\n{e}")
             return []
+        finally:
+            self.db.fecharConexao()
+
+    def recuperar_pratos_para_pedido(self, pedido_id: int) -> dict:
+        """
+        Retorna todos os pratos que NÃO estão no pedido especificado.
+
+        Args:
+            pedido_id (int): ID do pedido.
+
+        Returns:
+           dict: {'id': int, 'nome': str, 'preco': Decimal}.
+        """
+        try:
+            self.db.abrirConexao()
+            # Monta a query: pratos que não possuem associação em Pedido_Pratos para este pedido
+            sql = """
+                SELECT p.id, p.nome, pr.preco AS preco 
+                FROM pratos p 
+                JOIN precos pr ON p.fk_preco = pr.id 
+                LEFT JOIN pedido_pratos pp 
+                    ON p.id = pp.prato_id AND pp.pedido_id = %s
+                WHERE pp.prato_id IS NULL
+                ORDER BY p.nome
+                """
+            self.db.cursor.execute(sql, (pedido_id,))
+            rows = self.db.cursor.fetchall()
+
+            pratos_disponiveis = [
+                {"id": row["id"], "nome": row["nome"], "preco": row["preco"]}
+                for row in rows
+            ]
+
+            return {"pedido_id": pedido_id, "pratos": pratos_disponiveis}
+
+        except mysql.connector.Error as e:
+            print(f"❌ Erro ao recuperar pratos para pedido {pedido_id}: \n{e}")
+            return []
+
         finally:
             self.db.fecharConexao()
 
