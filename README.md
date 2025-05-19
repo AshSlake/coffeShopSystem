@@ -4,7 +4,7 @@
   />
 
   <h1>
-   Projeto do sistema da cefeteria CoffeShop da Tia Rosa
+   Projeto do sistema da cefeteria CoffeShop da Tia Rosa para O Trabalho da Faculdade - Lógica- Algoritmos e Programação de Computadores
   </h1>
 
   <p>
